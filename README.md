@@ -67,7 +67,7 @@ reports/CVE-2026-109618/
 
 Every diagram node cites a Fact ID. An entry point or attack path that the sources do not state is drawn as "unknown" (不明); the AI does not fill it in.
 
-The [baseline sample](examples/CVE-2026-109618/report.md) was written from saved fixture data by following the Skill during development. It has not yet been evaluated independently in a separate Claude Code session. Its overview diagram (labels are in Japanese, as the Skill writes them):
+The [baseline sample](examples/CVE-2026-109618/report.md) was produced from saved fixture data by following the Skill. It has not yet been reviewed independently by a third party. Its overview diagram (labels are in Japanese, as the Skill writes them):
 
 ```mermaid
 flowchart LR
