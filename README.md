@@ -82,6 +82,8 @@ Sources:
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | Whether the CVE is known to be exploited in the wild |
 | [FIRST EPSS](https://www.first.org/epss/) | Estimated probability of exploitation |
 
+This product uses data from the NVD API but is not endorsed or certified by the NVD. CVE is a trademark of The MITRE Corporation. See [NOTICE](NOTICE) for the terms of each source.
+
 ## Getting started
 
 You need:
@@ -167,4 +169,4 @@ To report a vulnerability in vulnograph itself, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-The source code is licensed under the [MIT License](LICENSE). Rights to the content of the saved API data in `testdata` and `examples` belong to their respective providers.
+The source code is licensed under the [MIT License](LICENSE). The saved API data in `testdata` and `examples` is not covered by it and remains subject to its providers' terms; see [NOTICE](NOTICE) for sources, copyright and attribution.

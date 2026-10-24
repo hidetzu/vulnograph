@@ -81,6 +81,8 @@ flowchart LR
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | 実際の悪用が確認されているか |
 | [FIRST EPSS](https://www.first.org/epss/) | 悪用される確率の推定値 |
 
+This product uses data from the NVD API but is not endorsed or certified by the NVD.（本製品は NVD API のデータを使用していますが、NVD の承認・認定を受けたものではありません。）CVE は The MITRE Corporation の商標です。各情報源の利用条件は [NOTICE](NOTICE) を参照してください。
+
 ## はじめに
 
 必要なもの:
@@ -166,4 +168,4 @@ vulnograph 自体の脆弱性の報告は [SECURITY.md](SECURITY.md)（英語）
 
 ## ライセンス
 
-ソースコードは [MIT License](LICENSE)。testdata と examples の保存済み API データの内容の権利は、各情報提供元に帰属します。
+ソースコードは [MIT License](LICENSE)。testdata と examples の保存済み API データは MIT License の対象外で、各情報提供元の利用条件に従います。出典、著作権表示、帰属表示は [NOTICE](NOTICE)（英語）を参照してください。
