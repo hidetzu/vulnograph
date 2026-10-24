@@ -135,7 +135,7 @@ API の認証情報は任意で、環境変数 `NVD_API_KEY` と `GITHUB_TOKEN` 
 
 ## 制限事項
 
-- レポートの品質は、まだ 1 件の CVE でしか確認していません。10〜20 件の CVE での確認を予定しています。
+- レポートの品質は、まだ 1 件の CVE でしか確認していません。10〜20 件の CVE での確認を予定しています（[残作業](docs/design.md#remaining-work)）。
 - Skill は事実や攻撃経路を創作しないよう指示されていますが、文章は AI が書きます。重要な主張は引用された出典で確認してください。
 - ベンダーの Web ページは取得しません。取得するのは CVE が参照する GitHub のアドバイザリだけです。その他の参照先は一覧として残します。
 - CISA KEV に載っていないことは「悪用されていない」ことを意味しません。EPSS は特定の日の推定値です。ディストリビューションのバックポート修正は自分で確認してください。
@@ -146,7 +146,9 @@ API の認証情報は任意で、環境変数 `NVD_API_KEY` と `GITHUB_TOKEN` 
 - [evidence の形式](docs/evidence-format.md)（英語）: JSON の全項目と status
 - [通信と安全性](docs/network-and-safety.md)（英語）: 接続先、制限、認証情報、非信頼データの扱い
 - [Skill の手順](skills/vulnograph/SKILL.md): レポートと図の書き方
-- [判断記録](docs/decisions.md)と[初期設計](docs/implementation-plan.md)
+- [設計](docs/design.md)（英語）: 目的、原則、リリース計画、残作業
+- [設計判断](docs/decisions.md)（英語）: 判断とその理由
+- [テストデータ](testdata/README.md)（英語）: fixture の出典
 - [CHANGELOG](CHANGELOG.md)
 
 ## 貢献

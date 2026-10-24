@@ -136,7 +136,7 @@ Even with exit code 0, read `warnings` and each source's `status` in the JSON: a
 
 ## Limitations
 
-- Reports are in Japanese. Report quality has been checked on one CVE so far; review against 10–20 CVEs is planned.
+- Reports are in Japanese. Report quality has been checked on one CVE so far; review against 10–20 CVEs is planned (see [remaining work](docs/design.md#remaining-work)).
 - The Skill is guided to avoid invented facts and attack paths, but its output is written by an AI. Check important claims against the cited sources.
 - Vendor web pages are not fetched; only GitHub advisories referenced by the CVE are. Other references are listed for you to read.
 - Absence from CISA KEV does not mean "not exploited". EPSS is an estimate on a given date. Check backported fixes from your distribution yourself.
@@ -147,7 +147,9 @@ Even with exit code 0, read `warnings` and each source's `status` in the JSON: a
 - [Evidence format](docs/evidence-format.md): every JSON field and status
 - [Network access and safety](docs/network-and-safety.md): hosts, limits, credentials and untrusted content
 - [Skill instructions](skills/vulnograph/SKILL.md): how reports and diagrams are written (Japanese)
-- [Design decisions](docs/decisions.md) and [initial design](docs/implementation-plan.md) (Japanese)
+- [Design](docs/design.md): goals, principles, release plan and remaining work
+- [Design decisions](docs/decisions.md): why things are the way they are
+- [Test data](testdata/README.md): where the fixtures come from
 - [CHANGELOG](CHANGELOG.md)
 
 ## Contributing

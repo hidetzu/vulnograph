@@ -25,6 +25,8 @@ Tests run offline. Do not add tests that call external APIs.
 
 ## Rules for changes
 
+These rules apply the [design principles](docs/design.md#principles) to code changes.
+
 - **Keep every fact traceable.** A fact must come from a successfully validated source and carry a `source_pointer` into that source's body. Validate a response completely before adding any fact from it.
 - **Distinguish failure from absence.** A truncated, malformed or empty response is `fetch_failed` or `unknown`, never `not_found`.
 - **The CLI does not interpret.** Interpretation, summarization and diagrams belong to the Skill. The CLI must not resolve differences between sources.
