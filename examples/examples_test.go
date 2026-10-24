@@ -16,6 +16,8 @@ var (
 	label     = regexp.MustCompile(`\["([^"]*)"\]`)
 	citation  = regexp.MustCompile(`\bF([0-9]+)/S([0-9]+)\b`)
 	factID    = regexp.MustCompile(`\bF[0-9]+\b`)
+	node      = regexp.MustCompile(`\b([A-Za-z][A-Za-z0-9_]*)\["([^"]*)"\]`)
+	edge      = regexp.MustCompile(`^\s*([A-Za-z][A-Za-z0-9_]*)(?:\["[^"]*"\])?\s*(-->|-\.->)(?:\|[^|]*\|)?\s*([A-Za-z][A-Za-z0-9_]*)`)
 	forbidden = []string{"click", "href", "http", "%%{", "<", ">", "`", "[", "]", "\""}
 )
 
@@ -45,6 +47,7 @@ func TestExamples(t *testing.T) {
 					t.Fatalf("report.md does not embed %s verbatim", name)
 				}
 				checkDiagram(t, name, diagram, sources)
+				checkPaths(t, name, parseGraph(diagram), disjointImpacts[dir])
 			}
 			overview := read(t, dir, "overview.mmd")
 			last := -1
@@ -61,6 +64,78 @@ func TestExamples(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// disjointImpacts marks examples whose proven and unproven impacts arise on
+// different paths, so no node may lead to both.
+var disjointImpacts = map[string]bool{
+	// GHSA: FPM exits the child when request startup fails; the FPM concern
+	// applies only to OOM after normal startup, not to the mod_php path.
+	"CVE-2026-109618": true,
+}
+
+type graph struct {
+	labels map[string]string
+	edges  map[string][]string
+	dashed map[[2]string]bool
+}
+
+func parseGraph(diagram string) graph {
+	g := graph{labels: map[string]string{}, edges: map[string][]string{}, dashed: map[[2]string]bool{}}
+	for _, line := range strings.Split(diagram, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "subgraph ") {
+			continue
+		}
+		for _, m := range node.FindAllStringSubmatch(line, -1) {
+			g.labels[m[1]] = m[2]
+		}
+		if m := edge.FindStringSubmatch(line); m != nil {
+			g.edges[m[1]] = append(g.edges[m[1]], m[3])
+			g.dashed[[2]string{m[1], m[3]}] = m[2] == "-.->"
+		}
+	}
+	return g
+}
+
+func proven(label string) bool {
+	return strings.Contains(label, "実証") && !strings.Contains(label, "未実証")
+}
+
+// Unproven impacts are reached only by dashed edges. With disjoint, a node
+// that leads to a proven impact must not also lead to an unproven one.
+func checkPaths(t *testing.T, name string, g graph, disjoint bool) {
+	t.Helper()
+	for pair, dashed := range g.dashed {
+		if strings.Contains(g.labels[pair[1]], "未実証") && !dashed {
+			t.Fatalf("%s: unproven node %s is reached by a solid edge from %s", name, pair[1], pair[0])
+		}
+	}
+	if !disjoint {
+		return
+	}
+	for from := range g.labels {
+		seen := map[string]bool{}
+		queue := []string{from}
+		var confirmed, unproven string
+		for len(queue) > 0 {
+			id := queue[0]
+			queue = queue[1:]
+			if label := g.labels[id]; proven(label) {
+				confirmed = label
+			} else if strings.Contains(label, "未実証") {
+				unproven = label
+			}
+			for _, next := range g.edges[id] {
+				if !seen[next] {
+					seen[next] = true
+					queue = append(queue, next)
+				}
+			}
+		}
+		if confirmed != "" && unproven != "" {
+			t.Fatalf("%s: %q leads to both %q and %q", name, g.labels[from], confirmed, unproven)
+		}
 	}
 }
 

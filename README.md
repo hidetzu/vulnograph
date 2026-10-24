@@ -75,19 +75,24 @@ The [baseline sample](examples/CVE-2026-109618/report.md) was written from saved
 flowchart LR
   subgraph IN["攻撃の入口"]
     A["認証なしでネットワークから送るリクエスト F24/S3"]
+    B["攻撃者が操作できる入力 認証の要否は不明 F24/S3"]
   end
   subgraph CAUSE["脆弱性の原因"]
-    B["フォーム送信形式の本文でメモリを使い切らせる F24/S3"]
-    C["メモリ不足時の後始末が不完全で壊れた状態が残る F24/S3"]
+    C["アプリが動く前の本文解析でメモリを使い切らせる F24/S3"]
+    D["後始末が不完全で壊れた状態が残る F24/S3"]
+    E["アプリの処理中にメモリ不足になる F24/S3"]
+    F["後始末が不完全で壊れた状態が残る F24/S3"]
   end
   subgraph HARM["被害"]
-    D["Web サーバーの実行権限でコードが動く mod_php で実証 F24/S3"]
-    E["PHP-FPM でも起こり得る 完全な攻撃は未実証 F24/S3"]
+    G["Web サーバーの実行権限でコードが動く Apache mod_php で実証 F24/S3"]
+    H["PHP-FPM でも起こり得る 完全な攻撃は未実証 F24/S3"]
   end
-  A --> B
-  B --> C
+  A --> C
   C --> D
-  C -.-> E
+  D --> G
+  B -.-> E
+  E -.-> F
+  F -.-> H
 ```
 
 ## Data contract and sources
