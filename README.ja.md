@@ -4,60 +4,29 @@ Turn vulnerability data into visual understanding.
 
 [English](README.md) | 日本語
 
-CVE の公式情報を Go CLI で収集し、Agent Skill が出典付き日本語レポートと Mermaid の図（初心者向け概要図・技術詳細図）を作成します。CLI に LLM 依存はありません。現在は **0.1.0-dev.1 相当の初期実装**です。
+[![ci](https://github.com/hidetzu/vulnograph/actions/workflows/ci.yml/badge.svg)](https://github.com/hidetzu/vulnograph/actions/workflows/ci.yml)
 
-## Quick Start
+CVE 番号を渡すと、その脆弱性を説明するレポートと図を作成します。攻撃の入口、何が壊れるのか、何が起こり得るのか、影響を受けるバージョン、対策がわかります。すべての主張に公式の出典を付け、出典に書かれていないことは推測で埋めずに「不明」と示します。
 
-Go 1.24 以上。標準ライブラリのみで動きます。
+脆弱性情報を短時間で理解し、何を確認すべきかを判断したい開発者、インフラエンジニア、技術責任者向けです。
 
-まだリリースタグがないため、クローンしてビルドします。固定データと Skill もクローンに含まれます。
+> [!NOTE]
+> - vulnograph はスキャナではありません。利用者の環境が脆弱かどうかは判定しません。
+> - 開発初期のリリース（0.1.0-dev.1）です。互換性のない変更が入る可能性があります。
 
-```bash
-git clone https://github.com/hidetzu/vulnograph.git
-cd vulnograph
-go build -o vulnograph ./cmd/vulnograph
-./vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
-./vulnograph fetch CVE-2026-109618 --format json
-```
+## 得られるもの
 
-ネットワークを使わず、保存済みデータで再現する場合:
-
-```bash
-./vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618
-```
-
-`--output` がなければ stdout に JSON、診断は stderr に出力します。新規出力ファイルは 0644、既存ファイルの更新時はそのアクセス権限を保持します。フラグは CVE ID の後に指定します。ID の小文字・前後空白は正規化します。
-
-終了コードは `0`: 公開済み CVE レコード、または説明文を含む NVD レコードあり（一部取得失敗を含む）、`1`: 利用可能な基本レコードなし（RESERVED のみ、NVD が ID だけのレコード等）・REJECTED・入出力失敗、`2`: 引数エラーです。**終了コード 0 でも sources、warnings、state を必ず確認してください。** CVE 公式の公開状態が不明でも、NVD の情報だけで部分成功する場合があります。404 だけでは予約済みと未登録を区別できません。
-
-任意の認証情報は `NVD_API_KEY` と `GITHUB_TOKEN` から読みます。トークンをコマンド引数に入れないでください。GitHub トークンは GitHub API、NVD キーは NVD にのみ送ります。
-
-## Skill
-
-単一の正本は [skills/vulnograph/SKILL.md](skills/vulnograph/SKILL.md) です。対象プロジェクトにリンクを作れます。既存の配置は上書きしません。
-
-```bash
-sh scripts/install-skill.sh codex /path/to/project
-sh scripts/install-skill.sh claude /path/to/project
-```
-
-Codex は `.agents/skills`、Claude Code は `.claude/skills` に配置します。対象環境から CLI が利用できるよう PATH に追加するか、このリポジトリで `go run ./cmd/vulnograph` を使ってください。配置先が管理環境で書き込み禁止の場合は、書き込み可能なプロジェクトに配置します。
-
-Codex では `$vulnograph`、Claude Code では `/vulnograph`、または自然文で「CVE-2026-109618 を vulnograph で図解して」と依頼します。利用環境の検出・権限設定に依存するため、同じスラッシュコマンドが両方で使えるとは仮定しません。配置と呼び出し方法は [Codex 公式](https://learn.chatgpt.com/docs/build-skills) と [Claude Code 公式](https://code.claude.com/docs/en/skills) を確認しています（2026-10-24）。
-
-出力先:
+CVE ごとに次のファイルを作成します。
 
 ```text
 reports/CVE-2026-109618/
-  evidence.json
-  report.md
-  overview.mmd   # 初心者向け: 攻撃の入口 → 脆弱性の原因 → 被害
-  diagram.mmd    # 技術詳細: 出典付きの因果関係
+  report.md      # 要約、原因、成立条件、被害、影響・修正バージョン、対策、確認事項
+  overview.mmd   # 初心者向けの概要図: 攻撃の入口 → 脆弱性の原因 → 被害
+  diagram.mmd    # 技術詳細図: 出典が述べる因果関係
+  evidence.json  # すべての主張の根拠となる収集データ
 ```
 
-どちらの図も各ノードに Fact ID を付けます。出典に記載のない攻撃の入口や経路は「不明」とし、AI が補完しません。
-
-[基準ケースのサンプル](examples/CVE-2026-109618/report.md) は固定取得データから Skill の手順で作成したものです。第三者による独立したレビューは未実施です。
+例として [CVE-2026-109618 のサンプルレポート](examples/CVE-2026-109618/report.md)（PHP のリモートコード実行の脆弱性）を参照してください。その概要図です。
 
 ```mermaid
 flowchart LR
@@ -83,52 +52,113 @@ flowchart LR
   F -.-> H
 ```
 
-## データ契約と情報源
+図の読み方:
 
-[Go の型定義](internal/evidence/evidence.go) が `schema_version: "0.2"` の正本です。互換性のない変更ではバージョンを変更し、[CHANGELOG](CHANGELOG.md) に記録します。
+- `F24/S3` は、そのノードが evidence.json の出典 S3 から得た事実 F24 に基づくことを示します。各出典の URL と取得日時はレポートに載っています。
+- 実線は出典が述べている関係、破線は出典が実証していない可能性です。
+- 上下の 2 列は別々の攻撃経路です。出典に根拠のないノードは「不明」と描きます。
 
-| 情報源 | 取得内容 |
-| --- | --- |
-| CVE Program API | 公開状態、説明、影響製品、CVSS、CWE、参照 URL |
-| NVD API 2.0 | 説明、CVSS、CWE、CPE 構成を原構造のまま保持 |
-| GitHub repository/global advisory API | CVE/NVD が参照する GHSA の説明、深刻度、CVSS、CWE、影響範囲、修正版、公開・取り下げ状態 |
-| CISA KEV | `count` と件数が一致する完全なカタログの取得に成功した場合のみ掲載有無を判定 |
-| FIRST EPSS | スコアと観測日 |
+## 仕組み
 
-Fact は ID、source_ids、値、`source_pointer`（取得本文内の位置を示す JSON Pointer）を持ちます。説明文・修正版・URL など値を正規化した場合は `original` に原文の値を残します。sources は URL・取得日時・取得本文の SHA-256・公開日時（取得できた場合）を保持します。影響範囲を CLI が解釈して環境の脆弱性を判定することはありません。`cvss`、`affected`、`fixed` は Fact ID の配列（索引）で、値の正本は facts のみです。
-
-| status | 意味 |
-| --- | --- |
-| ok | 取得・検証成功／シグナル掲載あり |
-| not_found | 当該情報源でレコード・掲載なし |
-| unknown | 判定不能、未取得、未公開等 |
-| fetch_failed | 通信、HTTP、JSON、応答検証の失敗（件数不一致や中身のないレコードを含む） |
-| not_applicable | REJECTED などの非該当 |
-
-KEV／EPSS の取得失敗時、シグナルは unknown、対応する source は fetch_failed です。`conflicts` は同一言語の説明文の不一致候補を保持します。意味の矛盾かどうかは Skill／人間が確認します。自動的に片方へ統合しません。
-
-## 制約と安全性
-
-- 任意ベンダー HTML の自動取得は未実装です。PHP の基準ケースは PHP 公式リポジトリの GHSA を取得します。その他の URL は未取得理由と共に記録します。本文内リンクの再帰巡回、GHSA の網羅検索、ADP コンテナの取り込みは行いません。
-- HTTPS・固定ホスト許可リスト・DNS 解決後の公開 IP 検証を使い、HTTP リダイレクトとプロキシ経由の取得を無効にしています。単一応答は 16 MiB、HTTP 要求は 30 秒、全体は 3 分、参照取得は 32 件までです。
-- ホストごとに通常 1 秒、NVD は無キー 6 秒／キーあり 600 ms の間隔を取り、429／5xx と通信失敗は最大 3 回試行します。Retry-After が 30 秒を超える場合は待たずに失敗を記録します。分散した複数プロセス間のレート制御はありません。
-- 外部データは非信頼です。含まれる命令やコードを実行しません。レポート・図は Skill が根拠を照合し、特殊文字・HTML を安全に処理する必要があります。CLI は元の説明を JSON 文字列として保持します。
-- KEV 未掲載は「悪用なし」ではありません。EPSS は観測日の推定値です。バックポートや実行形態を人間が確認してください。
-- ソース間の版範囲・CVSS の意味的矛盾検出、10〜20 CVE のレビュー、別クライアントでの Skill 評価は残作業です。[進捗と判断記録](docs/decisions.md) を参照してください。
-
-## 開発
-
-```bash
-go test ./...
-go test -race ./...
-go vet ./...
-go build ./...
+```mermaid
+flowchart LR
+  A["CVE 番号"] --> B["vulnograph CLI"]
+  B --> C["evidence.json"]
+  C --> D["Claude Code / Codex の vulnograph Skill"]
+  D --> E["report.md と図"]
 ```
 
-固定フィクスチャ、部分成功、未知 CVE、API 制限、ネットワーク障害、信頼境界、異常入力（[testdata/anomalies](testdata/anomalies)）、全 fact の出典位置への追跡、基準ケースの SAPI 記述、サンプル図の安全性と根拠をテストします。CI は外部 API に依存しません。API のスナップショットは取得時の情報であり、現在の脆弱性情報を保証しません。
+1. **CLI**（Go 製）が公式情報を集め、各値がどこから来たかを記録します。LLM を使わず、解釈もしません。
+2. **Skill**（Claude Code／Codex 用の [Agent Skill](https://code.claude.com/docs/en/skills)）がその根拠を読み、説明を書きます。確認済み・推定・不明・矛盾を区別し、すべての主張に事実を引用します。
 
-貢献方法は [CONTRIBUTING.md](CONTRIBUTING.md)、vulnograph 自体の脆弱性の報告は [SECURITY.md](SECURITY.md) を参照してください（英語）。
+情報源:
+
+| 情報源 | 得られる情報 |
+| --- | --- |
+| [CVE Program](https://www.cve.org/) | CVE の公式レコード: 公開状態、説明、影響製品、CVSS、CWE、参照先 |
+| [NVD](https://nvd.nist.gov/) | NIST の分析: CVSS、CWE、影響を受ける構成（CPE） |
+| [GitHub Security Advisories](https://github.com/advisories)（GHSA） | CVE が参照するアドバイザリ（多くはプロジェクト自身が発行）: 詳細、影響・修正バージョン |
+| [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | 実際の悪用が確認されているか |
+| [FIRST EPSS](https://www.first.org/epss/) | 悪用される確率の推定値 |
+
+## はじめに
+
+必要なもの:
+
+- Go 1.24 以上
+- レポートの作成に [Claude Code](https://code.claude.com/docs/en/skills) または [Codex](https://learn.chatgpt.com/docs/build-skills)
+
+**1. CLI をビルドする。** まだリリースタグがないため、クローンしてビルドします。
+
+```bash
+git clone https://github.com/hidetzu/vulnograph.git
+cd vulnograph
+go build -o vulnograph ./cmd/vulnograph
+```
+
+`vulnograph` を `PATH` に置きます。置かない場合は、エージェントがこのリポジトリで `go run ./cmd/vulnograph` を使えます。
+
+**2. Skill をインストールする。** レポートを依頼するプロジェクトにリンクを作ります。既存の配置は上書きしません。
+
+```bash
+sh scripts/install-skill.sh claude /path/to/project   # .claude/skills/vulnograph
+sh scripts/install-skill.sh codex /path/to/project    # .agents/skills/vulnograph
+```
+
+**3. エージェントに依頼する。** そのプロジェクトで、Claude Code なら `/vulnograph`、Codex なら `$vulnograph` を使うか、普通の文で依頼します。
+
+```text
+CVE-2026-109618 を vulnograph で図解して
+```
+
+レポートは `reports/<CVE-ID>/` に作成されます。
+
+## CLI だけを使う
+
+```bash
+./vulnograph fetch CVE-2026-109618                    # evidence JSON を標準出力へ
+./vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
+./vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618   # 保存済みデータ、通信なし
+```
+
+フラグは CVE 番号の後に指定します。`--output` で新しく作るファイルの権限は 0644 で、既存のファイルは権限を保ちます。
+
+API の認証情報は任意で、環境変数 `NVD_API_KEY` と `GITHUB_TOKEN` から読みます。設定するとレート制限が緩和されます。コマンド引数には渡さないでください。
+
+| 終了コード | 意味 |
+| --- | --- |
+| `0` | 利用できる根拠を収集できた。一部の情報源は失敗している場合がある |
+| `1` | 利用できる CVE／NVD レコードがない（例: CVE が予約済みのみで NVD にもない）、CVE が取り下げ済み、または出力に失敗した |
+| `2` | 引数の誤り |
+
+終了コードが 0 でも、JSON の `warnings` と各情報源の `status` を確認してください。一部の情報源が欠けたまま成功する場合があります。全項目は [evidence の形式](docs/evidence-format.md)（英語）を参照してください。
+
+## 制限事項
+
+- レポートの品質は、まだ 1 件の CVE でしか確認していません。10〜20 件の CVE での確認を予定しています。
+- Skill は事実や攻撃経路を創作しないよう指示されていますが、文章は AI が書きます。重要な主張は引用された出典で確認してください。
+- ベンダーの Web ページは取得しません。取得するのは CVE が参照する GitHub のアドバイザリだけです。その他の参照先は一覧として残します。
+- CISA KEV に載っていないことは「悪用されていない」ことを意味しません。EPSS は特定の日の推定値です。ディストリビューションのバックポート修正は自分で確認してください。
+- 情報源間の違いは報告するだけで、どちらかに統一しません。
+
+## ドキュメント
+
+- [evidence の形式](docs/evidence-format.md)（英語）: JSON の全項目と status
+- [通信と安全性](docs/network-and-safety.md)（英語）: 接続先、制限、認証情報、非信頼データの扱い
+- [Skill の手順](skills/vulnograph/SKILL.md): レポートと図の書き方
+- [判断記録](docs/decisions.md)と[初期設計](docs/implementation-plan.md)
+- [CHANGELOG](CHANGELOG.md)
+
+## 貢献
+
+[CONTRIBUTING.md](CONTRIBUTING.md)（英語）を参照してください。テストは通信なしで実行できます。
+
+```bash
+go test -race ./...
+```
+
+vulnograph 自体の脆弱性の報告は [SECURITY.md](SECURITY.md)（英語）を参照してください。
 
 ## ライセンス
 
-ソースコードは [MIT License](LICENSE)。testdata と examples の外部 API スナップショットの内容の権利は各情報提供元に帰属します。
+ソースコードは [MIT License](LICENSE)。testdata と examples の保存済み API データの内容の権利は、各情報提供元に帰属します。
