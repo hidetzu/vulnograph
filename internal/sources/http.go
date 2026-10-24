@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/hidetzu/vulnograph/internal/buildinfo"
 )
 
 const maxBody = 16 << 20
@@ -25,14 +27,24 @@ func safeURL(raw string) bool {
 }
 
 // Block special-use ranges in addition to Go's private/local classifications.
-var nonPublicRanges = []string{"100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "240.0.0.0/4", "2001:db8::/32"}
+var nonPublicRanges = func() []*net.IPNet {
+	ranges := []string{"100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "240.0.0.0/4", "2001:db8::/32"}
+	blocks := make([]*net.IPNet, 0, len(ranges))
+	for _, cidr := range ranges {
+		_, block, err := net.ParseCIDR(cidr)
+		if err != nil {
+			panic(err)
+		}
+		blocks = append(blocks, block)
+	}
+	return blocks
+}()
 
 func publicIP(ip net.IP) bool {
 	if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() {
 		return false
 	}
-	for _, cidr := range nonPublicRanges {
-		_, block, _ := net.ParseCIDR(cidr)
+	for _, block := range nonPublicRanges {
 		if block.Contains(ip) {
 			return false
 		}
@@ -54,14 +66,31 @@ func NewClient() *http.Client {
 		if len(ips) == 0 {
 			return nil, fmt.Errorf("no addresses")
 		}
-		for _, ip := range ips {
-			if !publicIP(ip.IP) {
-				return nil, fmt.Errorf("non-public address blocked")
-			}
-		}
-		return (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, net.JoinHostPort(ips[0].IP.String(), port))
+		return dialPublic(ctx, network, port, ips, (&net.Dialer{Timeout: 10 * time.Second}).DialContext)
 	}
 	return &http.Client{Transport: tr, Timeout: 30 * time.Second, CheckRedirect: func(req *http.Request, via []*http.Request) error { return fmt.Errorf("redirect blocked") }}
+}
+
+// Validate every answer before connecting and pin each attempt to that IP.
+// A per-address budget leaves time for fallback within the HTTP timeout.
+func dialPublic(ctx context.Context, network, port string, ips []net.IPAddr, dial func(context.Context, string, string) (net.Conn, error)) (net.Conn, error) {
+	for _, ip := range ips {
+		if !publicIP(ip.IP) {
+			return nil, fmt.Errorf("non-public address blocked")
+		}
+	}
+	for _, ip := range ips {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		attempt, cancel := context.WithTimeout(ctx, 5*time.Second)
+		conn, err := dial(attempt, network, net.JoinHostPort(ip.String(), port))
+		cancel()
+		if err == nil {
+			return conn, nil
+		}
+	}
+	return nil, fmt.Errorf("all validated addresses failed")
 }
 
 type response struct {
@@ -114,7 +143,7 @@ func (c *Collector) get(ctx context.Context, key, raw string) response {
 		if e != nil {
 			return response{Reason: "invalid request"}
 		}
-		req.Header.Set("User-Agent", "vulnograph/0.1.0-dev.1")
+		req.Header.Set("User-Agent", "vulnograph/"+buildinfo.Version)
 		req.Header.Set("Accept", "application/json")
 		if u.Hostname() == "services.nvd.nist.gov" && c.NVDKey != "" {
 			req.Header.Set("apiKey", c.NVDKey)
@@ -143,8 +172,13 @@ func (c *Collector) get(ctx context.Context, key, raw string) response {
 		if (res.StatusCode == 429 || res.StatusCode >= 500) && attempt < 2 {
 			delay := time.Duration(attempt+1) * time.Second
 			if s := res.Header.Get("Retry-After"); s != "" {
-				if n, e := strconv.Atoi(s); e == nil {
+				if n, e := strconv.ParseUint(s, 10, 64); e == nil {
+					if n > 30 {
+						return response{Code: res.StatusCode, Reason: "retry delay exceeds budget"}
+					}
 					delay = time.Duration(n) * time.Second
+				} else if strings.Trim(s, "0123456789") == "" {
+					return response{Code: res.StatusCode, Reason: "retry delay exceeds budget"}
 				} else if t, e := http.ParseTime(s); e == nil {
 					delay = time.Until(t)
 				}
@@ -180,7 +214,5 @@ func cleanURL(raw string) string {
 	if e != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil {
 		return ""
 	}
-	u.RawQuery = ""
-	u.Fragment = ""
 	return strings.TrimSpace(u.String())
 }

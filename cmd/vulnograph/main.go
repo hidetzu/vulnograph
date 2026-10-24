@@ -12,13 +12,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/hidetzu/vulnograph/internal/buildinfo"
 	"github.com/hidetzu/vulnograph/internal/evidence"
 	"github.com/hidetzu/vulnograph/internal/sources"
 )
 
 func run(ctx context.Context, args []string, out, errout io.Writer) int {
 	if len(args) == 1 && (args[0] == "--version" || args[0] == "version") {
-		fmt.Fprintln(out, "vulnograph 0.1.0-dev.1")
+		fmt.Fprintln(out, "vulnograph "+buildinfo.Version)
 		return 0
 	}
 	if len(args) < 2 || args[0] != "fetch" {
@@ -66,6 +67,19 @@ func run(ctx context.Context, args []string, out, errout io.Writer) int {
 		}
 		name := f.Name()
 		defer os.Remove(name)
+		mode := os.FileMode(0644)
+		if info, err := os.Stat(*output); err == nil {
+			mode = info.Mode().Perm()
+		} else if !os.IsNotExist(err) {
+			f.Close()
+			fmt.Fprintln(errout, "cannot inspect output file")
+			return 1
+		}
+		if err := f.Chmod(mode); err != nil {
+			f.Close()
+			fmt.Fprintln(errout, "cannot set output permissions")
+			return 1
+		}
 		_, e = f.Write(b)
 		closeErr := f.Close()
 		if e != nil || closeErr != nil || os.Rename(name, *output) != nil {

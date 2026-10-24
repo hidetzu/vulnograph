@@ -108,10 +108,28 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 			fail(&d, s, "CVE response ID mismatch")
 		} else {
 			state := str(meta["state"])
-			d.Add("publication_state", state, s)
+			cna := object(object(record["containers"])["cna"])
+			valid := state == "PUBLISHED" || state == "REJECTED" || state == "RESERVED"
+			if state == "PUBLISHED" {
+				hasDescription := false
+				for _, entry := range list(cna["descriptions"]) {
+					if strings.TrimSpace(str(object(entry)["value"])) != "" {
+						hasDescription = true
+					}
+				}
+				if !hasDescription {
+					fail(&d, s, "published CVE lacks descriptions")
+					valid = false
+				}
+			}
+			if valid {
+				d.Add("publication_state", state, s)
+			}
 			switch state {
 			case "PUBLISHED":
-				d.State = evidence.OK
+				if valid {
+					d.State = evidence.OK
+				}
 			case "REJECTED":
 				d.State = evidence.NotApplicable
 			case "RESERVED":
@@ -119,13 +137,7 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 			default:
 				fail(&d, s, "unrecognized publication state")
 			}
-			if state == "PUBLISHED" {
-				cna := object(object(record["containers"])["cna"])
-				if len(list(cna["descriptions"])) == 0 {
-					fail(&d, s, "published CVE lacks descriptions")
-					d.State = evidence.Unknown
-					cna = nil
-				}
+			if state == "PUBLISHED" && valid {
 				addDescriptions(&d, cna["descriptions"], s)
 				for _, a := range list(cna["affected"]) {
 					d.Add("affected", a, s)
@@ -148,18 +160,23 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 	if v != nil {
 		n := object(v)
 		items, valid := n["vulnerabilities"].([]any)
+		idsValid := true
+		for _, item := range items {
+			if str(object(object(item)["cve"])["id"]) != id {
+				idsValid = false
+			}
+		}
+
 		if !valid {
 			fail(&d, s, "missing NVD vulnerabilities array")
+		} else if !idsValid {
+			fail(&d, s, "NVD response ID mismatch")
 		} else if len(items) == 0 {
 			d.Sources[len(d.Sources)-1].Status = evidence.NotFound
 			d.Warnings = append(d.Warnings, s+": no NVD record")
 		} else {
 			for _, item := range items {
 				r := object(object(item)["cve"])
-				if str(r["id"]) != id {
-					fail(&d, s, "NVD response ID mismatch")
-					continue
-				}
 				if d.State == evidence.NotFound || d.State == evidence.Unknown {
 					d.Warnings = append(d.Warnings, "NVD has a record; official CVE publication state remains unconfirmed")
 				}
@@ -226,8 +243,12 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 				d.Add("fixed", obj{"package": object(v)["package"], "version": patched}, s)
 			}
 			d.Add("affected", v, s)
-			if fixed := object(object(v)["first_patched_version"])["identifier"]; fixed != nil {
-				d.Add("fixed", fixed, s)
+			fixed := str(object(v)["first_patched_version"])
+			if fixed == "" {
+				fixed = str(object(object(v)["first_patched_version"])["identifier"])
+			}
+			if fixed != "" {
+				d.Add("fixed", obj{"package": object(v)["package"], "version": fixed}, s)
 			}
 		}
 	}
@@ -277,6 +298,15 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 			break
 		}
 	}
+	seenWarnings := map[string]bool{}
+	warnings := []string{}
+	for _, warning := range d.Warnings {
+		if !seenWarnings[warning] {
+			warnings = append(warnings, warning)
+			seenWarnings[warning] = true
+		}
+	}
+	d.Warnings = warnings
 	return d, nil
 }
 func addDescriptions(d *evidence.Document, v any, s string) {

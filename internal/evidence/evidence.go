@@ -95,7 +95,19 @@ func (d *Document) Add(field string, value any, source string) {
 	if field != "description" {
 		return
 	}
+	var current struct {
+		Lang string `json:"lang"`
+	}
+	if json.Unmarshal(raw, &current) != nil || current.Lang == "" {
+		return
+	}
 	for _, prior := range d.Facts[:len(d.Facts)-1] {
+		var previous struct {
+			Lang string `json:"lang"`
+		}
+		if json.Unmarshal(prior.Value, &previous) != nil || !strings.EqualFold(previous.Lang, current.Lang) {
+			continue
+		}
 		if prior.Field == field && string(prior.Value) != string(raw) && prior.SourceIDs[0] != source {
 			d.Conflicts = append(d.Conflicts, Conflict{Field: field, FactIDs: []string{prior.ID, f.ID}, Reason: "Source wording differs; semantic conflict requires human/Skill review."})
 		}

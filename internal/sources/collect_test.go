@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -253,5 +254,136 @@ func TestGoldenEvidence(t *testing.T) {
 		if !versions[v] {
 			t.Fatal("missing patched branch", v)
 		}
+	}
+}
+
+func TestReferenceIdentity(t *testing.T) {
+	p := copyFixture(t)
+	write(t, p, "cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"PUBLISHED"},"containers":{"cna":{"descriptions":[{"lang":"en","value":"Test"}],"references":[{"url":"https://bugs.php.net/bug.php?id=81234#details"},{"url":"https://bugs.php.net/bug.php?id=81235"}]}}}`)
+	d, e := (&Collector{Fixture: p}).Fetch(context.Background(), "CVE-2026-0001")
+	if e != nil {
+		t.Fatal(e)
+	}
+	urls := map[string]bool{}
+	for _, s := range d.Sources {
+		urls[s.URL] = true
+	}
+	for _, url := range []string{"https://bugs.php.net/bug.php?id=81234#details", "https://bugs.php.net/bug.php?id=81235"} {
+		if !urls[url] {
+			t.Fatal("reference lost", url)
+		}
+	}
+}
+
+func TestGlobalPatchedVersion(t *testing.T) {
+	for _, version := range []any{"1.2.3", obj{"identifier": "1.2.3"}} {
+		t.Run(fmt.Sprintf("%T", version), func(t *testing.T) {
+			p := copyFixture(t)
+			write(t, p, "cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"PUBLISHED"},"containers":{"cna":{"descriptions":[{"lang":"en","value":"Test"}],"references":[{"url":"https://github.com/advisories/GHSA-w8hw-w9fx-j79w"}]}}}`)
+			raw, _ := json.Marshal(obj{"cve_id": "CVE-2026-0001", "vulnerabilities": []any{obj{"package": obj{"name": "test"}, "first_patched_version": version}}})
+			write(t, p, "GHSA-w8hw-w9fx-j79w", string(raw))
+			d, e := (&Collector{Fixture: p}).Fetch(context.Background(), "CVE-2026-0001")
+			if e != nil {
+				t.Fatal(e)
+			}
+			if len(d.Fixed) != 1 {
+				t.Fatal("missing fixed version")
+			}
+			var value obj
+			json.Unmarshal(d.Fixed[0].Value, &value)
+			if str(value["version"]) != "1.2.3" || str(object(value["package"])["name"]) != "test" {
+				t.Fatal(value)
+			}
+		})
+	}
+}
+
+func TestInvalidSourceHasNoFacts(t *testing.T) {
+	for _, tc := range []struct{ key, body, source string }{
+		{"cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"PUBLISHED"},"containers":{"cna":{"descriptions":[]}}}`, "S1"},
+		{"cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"BOGUS"}}`, "S1"},
+		{"nvd", `{"vulnerabilities":[{"cve":{"id":"CVE-2026-0001","descriptions":[{"lang":"en","value":"Valid first entry"}]}},{"cve":{"id":"CVE-2026-9999"}}]}`, "S2"},
+	} {
+		t.Run(tc.key+tc.body, func(t *testing.T) {
+			p := copyFixture(t)
+			write(t, p, tc.key, tc.body)
+			d, e := (&Collector{Fixture: p}).Fetch(context.Background(), "CVE-2026-0001")
+			if e != nil {
+				t.Fatal(e)
+			}
+			for _, s := range d.Sources {
+				if s.ID == tc.source && s.Status != evidence.FetchFailed {
+					t.Fatal("invalid source accepted")
+				}
+			}
+			for _, facts := range [][]evidence.Fact{d.Facts, d.CVSS, d.Affected, d.Fixed} {
+				for _, f := range facts {
+					for _, id := range f.SourceIDs {
+						if id == tc.source {
+							t.Fatal("failed source produced fact", f.ID)
+						}
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestRetryAfterBounded(t *testing.T) {
+	for _, value := range []string{"31", "9999999999999", "184467440737095516160000"} {
+		t.Run(value, func(t *testing.T) {
+			calls := 0
+			c := Collector{Client: &http.Client{Transport: transport(func(*http.Request) (*http.Response, error) {
+				calls++
+				return &http.Response{StatusCode: 429, Header: http.Header{"Retry-After": []string{value}}, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+			})}}
+			r := c.get(context.Background(), "x", "https://api.first.org/data/v1/epss")
+			if calls != 1 || r.Reason != "retry delay exceeds budget" {
+				t.Fatal(calls, r)
+			}
+		})
+	}
+}
+
+func TestDialFallback(t *testing.T) {
+	ips := []net.IPAddr{{IP: net.ParseIP("2606:4700:4700::1111")}, {IP: net.ParseIP("1.1.1.1")}}
+	attempts := []string{}
+	client, server := net.Pipe()
+	defer server.Close()
+	conn, e := dialPublic(context.Background(), "tcp", "443", ips, func(ctx context.Context, network, address string) (net.Conn, error) {
+		attempts = append(attempts, address)
+		if len(attempts) == 1 {
+			return nil, errors.New("IPv6 unreachable")
+		}
+		return client, nil
+	})
+	if e != nil || conn != client || len(attempts) != 2 || attempts[1] != "1.1.1.1:443" {
+		t.Fatal(attempts, e)
+	}
+	conn.Close()
+	ips[1].IP = net.ParseIP("127.0.0.1")
+	_, e = dialPublic(context.Background(), "tcp", "443", ips, func(context.Context, string, string) (net.Conn, error) {
+		t.Fatal("dial attempted before all IPs validated")
+		return nil, nil
+	})
+	if e == nil {
+		t.Fatal("private address allowed")
+	}
+}
+
+func TestWarningDeduplication(t *testing.T) {
+	p := copyFixture(t)
+	write(t, p, "cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"RESERVED"}}`)
+	write(t, p, "nvd", `{"vulnerabilities":[{"cve":{"id":"CVE-2026-0001"}},{"cve":{"id":"CVE-2026-0001"}}]}`)
+	d, e := (&Collector{Fixture: p}).Fetch(context.Background(), "CVE-2026-0001")
+	if e != nil {
+		t.Fatal(e)
+	}
+	seen := map[string]bool{}
+	for _, w := range d.Warnings {
+		if seen[w] {
+			t.Fatal("duplicate warning", w)
+		}
+		seen[w] = true
 	}
 }

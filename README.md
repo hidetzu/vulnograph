@@ -20,7 +20,7 @@ go build -o vulnograph ./cmd/vulnograph
 ./vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618
 ```
 
-`--output` がなければ stdout に JSON、診断は stderr に出力します。フラグは CVE ID の後に指定します。ID の小文字・前後空白は正規化します。
+`--output` がなければ stdout に JSON、診断は stderr に出力します。新規出力ファイルは 0644、既存ファイルの更新時はそのアクセス権限を保持します。フラグは CVE ID の後に指定します。ID の小文字・前後空白は正規化します。
 
 終了コードは `0`: CVE または NVD に利用可能なレコードあり（一部取得失敗を含む）、`1`: 基本レコード取得不能・REJECTED・入出力失敗、`2`: 引数エラーです。**終了コード 0 でも sources、warnings、state を必ず確認してください。** CVE 公式の公開状態が不明でも、NVD の情報だけで部分成功する場合があります。404 だけでは予約済みと未登録を区別できません。
 
@@ -81,7 +81,7 @@ Fact は ID、source_ids、原文の構造化値、フィールド位置を持�
 | fetch_failed | 通信、HTTP、JSON、応答検証の失敗 |
 | not_applicable | REJECTED などの非該当 |
 
-KEV／EPSS の取得失敗時、シグナルは unknown、対応する source は fetch_failed です。`conflicts` は説明文の不一致候補を保持します。意味の矛盾かどうかは Skill／人間が確認します。自動的に片方へ統合しません。
+KEV／EPSS の取得失敗時、シグナルは unknown、対応する source は fetch_failed です。`conflicts` は同一言語の説明文の不一致候補を保持します。意味の矛盾かどうかは Skill／人間が確認します。自動的に片方へ統合しません。
 
 ## 制約と安全性
 
