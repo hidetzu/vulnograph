@@ -9,7 +9,7 @@ Go CLI が収集した事実を根拠に、日本語レポートと 2 種類の�
 
 ## 入力と取得
 
-ユーザーから CVE ID を取得し、`CVE-[0-9]{4}-[0-9]{4,}` に完全一致することを確認する。入力をシェル式として扱わない。リポジトリのルートで、インストール済み `vulnograph`、または `go run ./cmd/vulnograph` を使用する。
+ユーザーから CVE ID を取得し、`CVE-[0-9]{4}-[0-9]{4,}` に完全一致することを確認する。入力をシェル式として扱わない。作業中のプロジェクトのルートで、`PATH` 上の `vulnograph` を実行する。`vulnograph --version` で見つからない場合は、作業ディレクトリが vulnograph のリポジトリ自体であるときに限り `go run ./cmd/vulnograph` を使う。それ以外では取得を中止し、README の手順で CLI をインストールするよう利用者に案内する。evidence を自作・推測しない。
 
 ```bash
 vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
