@@ -6,84 +6,44 @@ English | [日本語](README.ja.md)
 
 [![ci](https://github.com/hidetzu/vulnograph/actions/workflows/ci.yml/badge.svg)](https://github.com/hidetzu/vulnograph/actions/workflows/ci.yml)
 
-vulnograph is a Go CLI that collects official information about a CVE into source-attributed evidence, plus an Agent Skill that turns that evidence into a Japanese report and Mermaid diagrams (a beginner-friendly overview and a technical detail diagram). The CLI has no LLM dependency: it collects and validates, and never interprets. The project is at **0.1.0-dev.1**, an early development release; expect breaking changes.
+Give vulnograph a CVE ID, and it produces a report and diagrams that explain the vulnerability: how an attacker gets in, what goes wrong, what can happen, which versions are affected, and how to fix it. Every claim cites the official source it came from, and what the sources do not say is marked as unknown rather than guessed.
 
-## Quick Start
+It is meant for developers, infrastructure engineers and technical leads who need to understand a CVE quickly and decide what to check.
 
-Requires Go 1.24 or later. Only the standard library is used.
+> [!NOTE]
+> - Reports are currently written in **Japanese** only.
+> - vulnograph is not a scanner. It does not decide whether your environment is vulnerable.
+> - This is an early development release (0.1.0-dev.1). Expect breaking changes.
 
-No release has been tagged yet, so build from a clone. The clone also provides the fixtures and the Skill.
+## What you get
 
-```bash
-git clone https://github.com/hidetzu/vulnograph.git
-cd vulnograph
-go build -o vulnograph ./cmd/vulnograph
-./vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
-./vulnograph fetch CVE-2026-109618 --format json
-```
-
-To reproduce from saved data without network access:
-
-```bash
-./vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618
-```
-
-Without `--output`, JSON goes to stdout and diagnostics to stderr. New output files are created with mode 0644; updating an existing file keeps its permissions. Flags go after the CVE ID. Lowercase IDs and surrounding whitespace are normalized.
-
-Exit codes:
-
-| Code | Meaning |
-| --- | --- |
-| `0` | A published CVE record, or an NVD record with a description, is available (other sources may have failed) |
-| `1` | No usable base record (for example only a RESERVED record, or an NVD record with only an ID), REJECTED, or an I/O failure |
-| `2` | Invalid arguments |
-
-**Always check `sources`, `warnings` and `state`, even when the exit code is 0.** A run can partially succeed from NVD alone when the official CVE publication state is unknown. An HTTP 404 alone does not distinguish a reserved CVE from a nonexistent one.
-
-Optional credentials are read from `NVD_API_KEY` and `GITHUB_TOKEN`. Do not pass tokens as command arguments. The GitHub token is sent only to the GitHub API, and the NVD key only to NVD.
-
-## Skill
-
-The single canonical Skill is [skills/vulnograph/SKILL.md](skills/vulnograph/SKILL.md). The installer links it into a target project and never overwrites an existing entry.
-
-```bash
-sh scripts/install-skill.sh codex /path/to/project
-sh scripts/install-skill.sh claude /path/to/project
-```
-
-Codex uses `.agents/skills` and Claude Code uses `.claude/skills`. Put the CLI on `PATH` for the target environment, or use `go run ./cmd/vulnograph` from this repository. If the target is read-only in a managed environment, install into a writable project instead.
-
-Invoke it with `$vulnograph` in Codex, `/vulnograph` in Claude Code, or in natural language, such as "Explain CVE-2026-109618 with vulnograph". Discovery and permissions depend on the client, so do not assume the same slash command works in both. Installation paths and invocation were checked against the [Codex documentation](https://learn.chatgpt.com/docs/build-skills) and the [Claude Code documentation](https://code.claude.com/docs/en/skills) on 2026-10-24.
-
-Output:
+For each CVE, vulnograph writes:
 
 ```text
 reports/CVE-2026-109618/
-  evidence.json
-  report.md      # Japanese report
-  overview.mmd   # For beginners: entry point -> root cause -> impact
-  diagram.mmd    # Technical detail: source-attributed causal chain
+  report.md      # Summary, root cause, conditions, impact, affected and fixed versions, mitigations, open questions
+  overview.mmd   # Beginner-friendly diagram: entry point -> root cause -> impact
+  diagram.mmd    # Technical diagram: the causal chain described by the sources
+  evidence.json  # The collected source data that every claim cites
 ```
 
-Every diagram node cites a Fact ID. An entry point or attack path that the sources do not state is drawn as "unknown" (不明); the AI does not fill it in.
-
-The [baseline sample](examples/CVE-2026-109618/report.md) was produced from saved fixture data by following the Skill. It has not yet been reviewed independently by a third party. Its overview diagram (labels are in Japanese, as the Skill writes them):
+See the [sample report for CVE-2026-109618](examples/CVE-2026-109618/report.md), a PHP remote code execution vulnerability. Its overview diagram, translated into English for this README:
 
 ```mermaid
 flowchart LR
-  subgraph IN["攻撃の入口"]
-    A["認証なしでネットワークから送るリクエスト F24/S3"]
-    B["攻撃者が操作できる入力 認証の要否は不明 F24/S3"]
+  subgraph IN["Entry point"]
+    A["Unauthenticated network request F24/S3"]
+    B["Attacker-controlled input, authentication unknown F24/S3"]
   end
-  subgraph CAUSE["脆弱性の原因"]
-    C["アプリが動く前の本文解析でメモリを使い切らせる F24/S3"]
-    D["後始末が不完全で壊れた状態が残る F24/S3"]
-    E["アプリの処理中にメモリ不足になる F24/S3"]
-    F["後始末が不完全で壊れた状態が残る F24/S3"]
+  subgraph CAUSE["Root cause"]
+    C["Request body parsing exhausts memory before the app runs F24/S3"]
+    D["Incomplete cleanup leaves corrupted state F24/S3"]
+    E["Memory runs out while the app is processing F24/S3"]
+    F["Incomplete cleanup leaves corrupted state F24/S3"]
   end
-  subgraph HARM["被害"]
-    G["Web サーバーの実行権限でコードが動く Apache mod_php で実証 F24/S3"]
-    H["PHP-FPM でも起こり得る 完全な攻撃は未実証 F24/S3"]
+  subgraph HARM["Impact"]
+    G["Code runs as the web server, demonstrated on Apache mod_php F24/S3"]
+    H["Possible on PHP-FPM, no complete exploit demonstrated F24/S3"]
   end
   A --> C
   C --> D
@@ -93,52 +53,113 @@ flowchart LR
   F -.-> H
 ```
 
-## Data contract and sources
+How to read it:
 
-The [Go type definitions](internal/evidence/evidence.go) are the source of truth for `schema_version: "0.2"`. Incompatible changes bump the version and are recorded in the [CHANGELOG](CHANGELOG.md).
+- `F24/S3` means the node is based on fact F24 from source S3 in `evidence.json`; the report lists each source's URL and retrieval time.
+- Solid arrows are stated by the sources. Dashed arrows are possibilities the sources have not demonstrated.
+- The two rows are separate attack paths. A node the sources do not support is drawn as unknown.
 
-| Source | Collected |
-| --- | --- |
-| CVE Program API | Publication state, descriptions, affected products, CVSS, CWE, reference URLs |
-| NVD API 2.0 | Descriptions, CVSS, CWE and CPE configurations, kept in their original structure |
-| GitHub repository/global advisory API | For GHSAs referenced by CVE/NVD: description, severity, CVSS, CWE, affected ranges, patched versions, publication and withdrawal state |
-| CISA KEV | Listing status, decided only from a complete catalog whose `count` matches its entries |
-| FIRST EPSS | Score and observation date |
+## How it works
 
-Each fact has an ID, `source_ids`, a value and a `source_pointer`, a JSON Pointer to its location in the retrieved response body. When a value is normalized (descriptions, patched versions, URLs), `original` keeps the value as it appears in the source. Each source records its URL, retrieval time, the SHA-256 of the retrieved body and, when available, its publication time. The CLI never interprets affected ranges to decide whether an environment is vulnerable. `cvss`, `affected` and `fixed` are arrays of Fact IDs (indexes); `facts` is the only place values are stored.
-
-| status | Meaning |
-| --- | --- |
-| ok | Retrieved and validated / listed in the signal |
-| not_found | No record or listing in that source |
-| unknown | Undetermined, not retrieved, unpublished, etc. |
-| fetch_failed | Network, HTTP, JSON or response validation failure, including count mismatches and records without content |
-| not_applicable | Not applicable, such as REJECTED |
-
-When KEV or EPSS cannot be retrieved, the signal is `unknown` and the corresponding source is `fetch_failed`. `conflicts` lists candidate mismatches between descriptions in the same language. Whether they are semantic conflicts is left to the Skill or a human; the CLI never merges them into one.
-
-## Limitations and safety
-
-- Arbitrary vendor HTML is not fetched. The PHP baseline retrieves the GHSA from PHP's official repository; other URLs are recorded with the reason they were not fetched. The CLI does not follow links inside bodies, search GHSA exhaustively, or import ADP containers.
-- Requests use HTTPS, a fixed host allowlist and public-IP validation after DNS resolution; HTTP redirects and proxies are disabled. Limits: 16 MiB per response, 30 seconds per HTTP request, 3 minutes overall, 32 reference fetches.
-- Requests to the same host are spaced 1 second apart (NVD: 6 seconds without a key, 600 ms with one). HTTP 429/5xx and network failures are tried up to 3 times. A Retry-After over 30 seconds is recorded as a failure without waiting. There is no rate control across multiple processes.
-- External data is untrusted; instructions or code inside it are never executed. The Skill must check reports and diagrams against the evidence and handle special characters and HTML safely. The CLI keeps original descriptions as JSON strings.
-- Absence from KEV does not mean "not exploited". EPSS is an estimate as of its observation date. A human must check backports and deployment modes.
-- Remaining work: semantic comparison of version ranges and CVSS across sources, review against 10–20 CVEs, and Skill evaluation in other clients. See the [decision log](docs/decisions.md) (Japanese).
-
-## Development
-
-```bash
-go test ./...
-go test -race ./...
-go vet ./...
-go build ./...
+```mermaid
+flowchart LR
+  A["CVE ID"] --> B["vulnograph CLI"]
+  B --> C["evidence.json"]
+  C --> D["vulnograph Skill in Claude Code or Codex"]
+  D --> E["report.md and diagrams"]
 ```
 
-Tests cover fixtures, partial success, unknown CVEs, API limits, network failures, trust boundaries, malformed inputs ([testdata/anomalies](testdata/anomalies)), traceability of every fact to its source location, and the safety and citations of the sample diagrams. CI does not depend on external APIs. The API snapshots reflect the time they were retrieved and do not represent current vulnerability information.
+1. The **CLI**, written in Go, collects official data and records where each value came from. It does not use an LLM and does not interpret anything.
+2. The **Skill**, an [Agent Skill](https://code.claude.com/docs/en/skills) for Claude Code or Codex, reads that evidence and writes the explanation. It separates confirmed facts, estimates, unknowns and conflicts, and cites a fact for every claim.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and [SECURITY.md](SECURITY.md) to report a vulnerability in vulnograph itself.
+Sources:
+
+| Source | What it provides |
+| --- | --- |
+| [CVE Program](https://www.cve.org/) | The official CVE record: state, description, affected products, CVSS, CWE, references |
+| [NVD](https://nvd.nist.gov/) | NIST's analysis: CVSS, CWE, affected configurations (CPE) |
+| [GitHub Security Advisories](https://github.com/advisories) (GHSA) | Advisories referenced by the CVE, often from the project itself: details, affected and patched versions |
+| [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | Whether the CVE is known to be exploited in the wild |
+| [FIRST EPSS](https://www.first.org/epss/) | Estimated probability of exploitation |
+
+## Getting started
+
+You need:
+
+- Go 1.24 or later
+- [Claude Code](https://code.claude.com/docs/en/skills) or [Codex](https://learn.chatgpt.com/docs/build-skills), to write reports
+
+**1. Build the CLI.** No release has been tagged yet, so build from a clone.
+
+```bash
+git clone https://github.com/hidetzu/vulnograph.git
+cd vulnograph
+go build -o vulnograph ./cmd/vulnograph
+```
+
+Put the `vulnograph` binary on your `PATH`, or the agent can run `go run ./cmd/vulnograph` from this repository.
+
+**2. Install the Skill** into the project where you will ask for reports. This creates a link and never overwrites an existing entry.
+
+```bash
+sh scripts/install-skill.sh claude /path/to/project   # .claude/skills/vulnograph
+sh scripts/install-skill.sh codex /path/to/project    # .agents/skills/vulnograph
+```
+
+**3. Ask the agent.** In that project, run `/vulnograph` in Claude Code or `$vulnograph` in Codex, or ask in plain words:
+
+```text
+Explain CVE-2026-109618 with vulnograph
+```
+
+The report is written to `reports/<CVE-ID>/`.
+
+## Using the CLI on its own
+
+```bash
+./vulnograph fetch CVE-2026-109618                    # print evidence JSON to stdout
+./vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
+./vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618   # saved data, no network
+```
+
+Flags go after the CVE ID. With `--output`, a new file is created with mode 0644, and an existing file keeps its permissions.
+
+Optional API credentials are read from the `NVD_API_KEY` and `GITHUB_TOKEN` environment variables; they raise rate limits. Never pass them as arguments.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Usable evidence was collected. Some sources may still have failed |
+| `1` | No usable CVE or NVD record (for example, the CVE is only reserved and NVD has no record), the CVE is rejected, or the output could not be written |
+| `2` | Invalid arguments |
+
+Even with exit code 0, read `warnings` and each source's `status` in the JSON: a run can succeed with some sources missing. See [Evidence format](docs/evidence-format.md) for every field.
+
+## Limitations
+
+- Reports are in Japanese. Report quality has been checked on one CVE so far; review against 10–20 CVEs is planned.
+- The Skill is guided to avoid invented facts and attack paths, but its output is written by an AI. Check important claims against the cited sources.
+- Vendor web pages are not fetched; only GitHub advisories referenced by the CVE are. Other references are listed for you to read.
+- Absence from CISA KEV does not mean "not exploited". EPSS is an estimate on a given date. Check backported fixes from your distribution yourself.
+- Differences between sources are reported, not resolved.
+
+## Documentation
+
+- [Evidence format](docs/evidence-format.md): every JSON field and status
+- [Network access and safety](docs/network-and-safety.md): hosts, limits, credentials and untrusted content
+- [Skill instructions](skills/vulnograph/SKILL.md): how reports and diagrams are written (Japanese)
+- [Design decisions](docs/decisions.md) and [initial design](docs/implementation-plan.md) (Japanese)
+- [CHANGELOG](CHANGELOG.md)
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Tests run offline:
+
+```bash
+go test -race ./...
+```
+
+To report a vulnerability in vulnograph itself, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-The source code is licensed under the [MIT License](LICENSE). Rights to the content of the external API snapshots in `testdata` and `examples` belong to their respective providers.
+The source code is licensed under the [MIT License](LICENSE). Rights to the content of the saved API data in `testdata` and `examples` belong to their respective providers.
