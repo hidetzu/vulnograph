@@ -90,20 +90,20 @@ This product uses data from the NVD API but is not endorsed or certified by the 
 - Go 1.24 以上
 - レポートの作成に [Claude Code](https://code.claude.com/docs/en/skills) または [Codex](https://learn.chatgpt.com/docs/build-skills)
 
-**1. CLI をビルドする。** まだリリースタグがないため、クローンしてビルドします。
+**1. CLI をインストールする。**
 
 ```bash
-git clone https://github.com/hidetzu/vulnograph.git
-cd vulnograph
-go install ./cmd/vulnograph   # $(go env GOPATH)/bin にインストール
+go install github.com/hidetzu/vulnograph/cmd/vulnograph@v0.1.0-dev.1   # $(go env GOPATH)/bin にインストール
 vulnograph --version
 ```
 
 Skill は `PATH` 上の `vulnograph` を実行するため、Claude Code や Codex を動かす環境で見つかる必要があります。`vulnograph --version` が見つからない場合は、`$(go env GOPATH)/bin` を `PATH` に追加してください。
 
-**2. Skill をインストールする。** レポートを依頼するプロジェクトにリンクを作ります。既存の配置は上書きしません。
+**2. Skill をインストールする。** Skill はリポジトリに含まれるため、先にクローンします。インストーラはレポートを依頼するプロジェクトにリンクを作り、既存の配置は上書きしません。
 
 ```bash
+git clone --branch v0.1.0-dev.1 https://github.com/hidetzu/vulnograph.git
+cd vulnograph
 sh scripts/install-skill.sh claude /path/to/project   # .claude/skills/vulnograph
 sh scripts/install-skill.sh codex /path/to/project    # .agents/skills/vulnograph
 ```

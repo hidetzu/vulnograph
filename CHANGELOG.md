@@ -4,7 +4,7 @@ All notable changes are recorded here. Versions follow [Semantic Versioning](htt
 
 ## Unreleased
 
-## 0.1.0-dev.1 (unreleased)
+## [0.1.0-dev.1](https://github.com/hidetzu/vulnograph/releases/tag/v0.1.0-dev.1) - 2026-10-24
 
 First development release.
 
