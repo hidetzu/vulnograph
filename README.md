@@ -91,20 +91,20 @@ You need:
 - Go 1.24 or later
 - [Claude Code](https://code.claude.com/docs/en/skills) or [Codex](https://learn.chatgpt.com/docs/build-skills), to write reports
 
-**1. Build the CLI.** No release has been tagged yet, so build from a clone.
+**1. Install the CLI.**
 
 ```bash
-git clone https://github.com/hidetzu/vulnograph.git
-cd vulnograph
-go install ./cmd/vulnograph   # installs to $(go env GOPATH)/bin
+go install github.com/hidetzu/vulnograph/cmd/vulnograph@v0.1.0-dev.1   # installs to $(go env GOPATH)/bin
 vulnograph --version
 ```
 
 The Skill runs `vulnograph` from your `PATH`, so it must be found there in the environment where Claude Code or Codex runs. If `vulnograph --version` is not found, add `$(go env GOPATH)/bin` to your `PATH`.
 
-**2. Install the Skill** into the project where you will ask for reports. This creates a link and never overwrites an existing entry.
+**2. Install the Skill** into the project where you will ask for reports. The Skill is in the repository, so clone it first. The installer creates a link and never overwrites an existing entry.
 
 ```bash
+git clone --branch v0.1.0-dev.1 https://github.com/hidetzu/vulnograph.git
+cd vulnograph
 sh scripts/install-skill.sh claude /path/to/project   # .claude/skills/vulnograph
 sh scripts/install-skill.sh codex /path/to/project    # .agents/skills/vulnograph
 ```
