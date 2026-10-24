@@ -1,0 +1,9 @@
+{
+  "ghsa_id": "GHSA-w8hw-w9fx-j79w",
+  "cve_id": "CVE-2026-0001",
+  "summary": "Synthetic advisory",
+  "cvss_severities": {"cvss_v3": {"vector_string": null, "score": null}, "cvss_v4": {"vector_string": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N", "score": 9.3}},
+  "cvss": {"vector_string": null, "score": null},
+  "cwes": [{"cwe_id": "CWE-416", "name": "Use After Free"}],
+  "vulnerabilities": [{"package": {"name": "Synthetic"}, "vulnerable_version_range": "< 1.1", "patched_versions": "1.1", "first_patched_version": "1.1"}]
+}

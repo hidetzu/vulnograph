@@ -1,0 +1,6 @@
+{
+  "totalResults": 1,
+  "vulnerabilities": [
+    {"cve": {"id": "CVE-2026-0001", "vulnStatus": "Received", "descriptions": [], "metrics": {}, "references": [{"url": "https://nvd.example/should-not-appear"}]}}
+  ]
+}

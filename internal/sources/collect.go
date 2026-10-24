@@ -111,19 +111,13 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 			cna := object(object(record["containers"])["cna"])
 			valid := state == "PUBLISHED" || state == "REJECTED" || state == "RESERVED"
 			if state == "PUBLISHED" {
-				hasDescription := false
-				for _, entry := range list(cna["descriptions"]) {
-					if strings.TrimSpace(str(object(entry)["value"])) != "" {
-						hasDescription = true
-					}
-				}
-				if !hasDescription {
+				if !hasDescription(cna["descriptions"]) {
 					fail(&d, s, "published CVE lacks descriptions")
 					valid = false
 				}
 			}
 			if valid {
-				d.Add("publication_state", state, s)
+				d.Add("publication_state", state, s, evidence.Pointer("cveMetadata", "state"))
 			}
 			switch state {
 			case "PUBLISHED":
@@ -138,18 +132,18 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 				fail(&d, s, "unrecognized publication state")
 			}
 			if state == "PUBLISHED" && valid {
-				addDescriptions(&d, cna["descriptions"], s)
-				for _, a := range list(cna["affected"]) {
-					d.Add("affected", a, s)
+				addDescriptions(&d, cna["descriptions"], s, "containers", "cna", "descriptions")
+				for i, a := range list(cna["affected"]) {
+					d.Add("affected", a, s, evidence.Pointer("containers", "cna", "affected", i))
 				}
-				for _, m := range list(cna["metrics"]) {
-					d.Add("cvss", m, s)
+				for i, m := range list(cna["metrics"]) {
+					d.Add("cvss", m, s, evidence.Pointer("containers", "cna", "metrics", i))
 				}
-				for _, p := range list(cna["problemTypes"]) {
-					d.Add("weakness", p, s)
+				for i, p := range list(cna["problemTypes"]) {
+					d.Add("weakness", p, s, evidence.Pointer("containers", "cna", "problemTypes", i))
 				}
-				for _, r := range list(cna["references"]) {
-					addReference(&d, object(r)["url"], s)
+				for i, r := range list(cna["references"]) {
+					addReference(&d, object(r)["url"], s, evidence.Pointer("containers", "cna", "references", i, "url"))
 				}
 			}
 		}
@@ -158,44 +152,7 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 	}
 	v, s = c.load(ctx, &d, "nvd", "nvd", "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId="+id)
 	if v != nil {
-		n := object(v)
-		items, valid := n["vulnerabilities"].([]any)
-		idsValid := true
-		for _, item := range items {
-			if str(object(object(item)["cve"])["id"]) != id {
-				idsValid = false
-			}
-		}
-
-		if !valid {
-			fail(&d, s, "missing NVD vulnerabilities array")
-		} else if !idsValid {
-			fail(&d, s, "NVD response ID mismatch")
-		} else if len(items) == 0 {
-			d.Sources[len(d.Sources)-1].Status = evidence.NotFound
-			d.Warnings = append(d.Warnings, s+": no NVD record")
-		} else {
-			for _, item := range items {
-				r := object(object(item)["cve"])
-				if d.State == evidence.NotFound || d.State == evidence.Unknown {
-					d.Warnings = append(d.Warnings, "NVD has a record; official CVE publication state remains unconfirmed")
-				}
-				d.Add("nvd_status", r["vulnStatus"], s)
-				addDescriptions(&d, r["descriptions"], s)
-				if m := r["metrics"]; m != nil {
-					d.Add("cvss", m, s)
-				}
-				if a := r["configurations"]; a != nil {
-					d.Add("affected", a, s)
-				}
-				for _, w := range list(r["weaknesses"]) {
-					d.Add("weakness", w, s)
-				}
-				for _, r := range list(r["references"]) {
-					addReference(&d, object(r)["url"], s)
-				}
-			}
-		}
+		addNVD(&d, object(v), id, s)
 	}
 	// Only repository advisory API URLs derived from recognized GitHub references
 	// are fetched. Other references remain visible with a reason.
@@ -227,48 +184,12 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 		if v == nil {
 			continue
 		}
-		a := object(v)
-		if str(a["cve_id"]) != id {
-			fail(&d, s, "advisory CVE mismatch")
-			continue
-		}
-		if summary := str(a["summary"]); summary != "" {
-			d.Add("advisory_summary", summary, s)
-		}
-		if body := str(a["description"]); body != "" {
-			d.Add("advisory_description", body, s)
-		}
-		for _, v := range list(a["vulnerabilities"]) {
-			if patched := str(object(v)["patched_versions"]); patched != "" {
-				d.Add("fixed", obj{"package": object(v)["package"], "version": patched}, s)
-			}
-			d.Add("affected", v, s)
-			fixed := str(object(v)["first_patched_version"])
-			if fixed == "" {
-				fixed = str(object(object(v)["first_patched_version"])["identifier"])
-			}
-			if fixed != "" {
-				d.Add("fixed", obj{"package": object(v)["package"], "version": fixed}, s)
-			}
-		}
+		addAdvisory(&d, object(v), id, key, s)
 	}
 	v, s = c.load(ctx, &d, "kev", "cisa_kev", "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json")
 	d.KEV.SourceIDs = []string{s}
 	if v != nil {
-		k := object(v)
-		items, valid := k["vulnerabilities"].([]any)
-		if !valid || str(k["catalogVersion"]) == "" {
-			fail(&d, s, "invalid KEV catalog")
-		} else {
-			d.KEV.Status = evidence.NotFound
-			for _, item := range items {
-				r := object(item)
-				if str(r["cveID"]) == id {
-					d.KEV.Status = evidence.OK
-					d.Add("known_exploitation", r, s)
-				}
-			}
-		}
+		addKEV(&d, object(v), id, s)
 	}
 	v, s = c.load(ctx, &d, "epss", "first_epss", "https://api.first.org/data/v1/epss?cve="+id)
 	d.EPSS.SourceIDs = []string{s}
@@ -283,7 +204,7 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 			score, err := strconv.ParseFloat(str(r["epss"]), 64)
 			date := str(r["date"])
 			_, dateErr := time.Parse("2006-01-02", date)
-			if str(r["cve"]) != id || err != nil || !(score >= 0 && score <= 1) || dateErr != nil {
+			if len(items) != 1 || str(r["cve"]) != id || err != nil || !(score >= 0 && score <= 1) || dateErr != nil {
 				fail(&d, s, "invalid EPSS ID, score or date")
 			} else {
 				d.EPSS.Status = evidence.OK
@@ -309,18 +230,185 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 	d.Warnings = warnings
 	return d, nil
 }
-func addDescriptions(d *evidence.Document, v any, s string) {
-	for _, item := range list(v) {
+func addDescriptions(d *evidence.Document, v any, s string, base ...any) {
+	for i, item := range list(v) {
 		r := object(item)
 		value := str(r["value"])
 		if value != "" {
-			d.Add("description", obj{"lang": r["lang"], "value": value}, s)
+			d.AddNormalized("description", obj{"lang": r["lang"], "value": value}, item, s, evidence.Pointer(append(base, i)...))
 		}
 	}
 }
-func addReference(d *evidence.Document, v any, s string) {
+func addReference(d *evidence.Document, v any, s, pointer string) {
 	if raw := cleanURL(str(v)); raw != "" {
-		d.Add("reference", raw, s)
+		d.AddNormalized("reference", raw, v, s, pointer)
+	}
+}
+
+func hasDescription(v any) bool {
+	for _, entry := range list(v) {
+		if strings.TrimSpace(str(object(entry)["value"])) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// addNVD validates the whole response before adding facts. A record that only
+// echoes the ID carries no usable evidence and must not count as success.
+func addNVD(d *evidence.Document, n obj, id, s string) {
+	items, valid := n["vulnerabilities"].([]any)
+	if !valid {
+		fail(d, s, "missing NVD vulnerabilities array")
+		return
+	}
+	if total, ok := n["totalResults"]; ok {
+		if f, isNumber := total.(float64); !isNumber || int(f) != len(items) {
+			fail(d, s, "NVD totalResults does not match returned records")
+			return
+		}
+	}
+	for _, item := range items {
+		r := object(object(item)["cve"])
+		if str(r["id"]) != id {
+			fail(d, s, "NVD response ID mismatch")
+			return
+		}
+		if !hasDescription(r["descriptions"]) {
+			fail(d, s, "NVD record lacks descriptions")
+			return
+		}
+	}
+	if len(items) == 0 {
+		d.Sources[len(d.Sources)-1].Status = evidence.NotFound
+		d.Warnings = append(d.Warnings, s+": no NVD record")
+		return
+	}
+	for i, item := range items {
+		r := object(object(item)["cve"])
+		at := func(parts ...any) string {
+			return evidence.Pointer(append([]any{"vulnerabilities", i, "cve"}, parts...)...)
+		}
+		if d.State == evidence.NotFound || d.State == evidence.Unknown {
+			d.Warnings = append(d.Warnings, "NVD has a record; official CVE publication state remains unconfirmed")
+		}
+		if status := str(r["vulnStatus"]); status != "" {
+			d.Add("nvd_status", status, s, at("vulnStatus"))
+		}
+		addDescriptions(d, r["descriptions"], s, "vulnerabilities", i, "cve", "descriptions")
+		if m := object(r["metrics"]); len(m) > 0 {
+			d.Add("cvss", m, s, at("metrics"))
+		}
+		if a := list(r["configurations"]); len(a) > 0 {
+			d.Add("affected", a, s, at("configurations"))
+		}
+		for j, w := range list(r["weaknesses"]) {
+			d.Add("weakness", w, s, at("weaknesses", j))
+		}
+		for j, ref := range list(r["references"]) {
+			addReference(d, object(ref)["url"], s, at("references", j, "url"))
+		}
+	}
+}
+
+// addAdvisory keeps the GHSA fields needed to judge the advisory itself:
+// identity, withdrawal, severity, weaknesses and per-package versions.
+func addAdvisory(d *evidence.Document, a obj, id, ghsa, s string) {
+	if str(a["cve_id"]) != id {
+		fail(d, s, "advisory CVE mismatch")
+		return
+	}
+	if got := str(a["ghsa_id"]); got != "" && got != ghsa {
+		fail(d, s, "advisory GHSA ID mismatch")
+		return
+	}
+	if state := str(a["state"]); state != "" {
+		d.Add("advisory_state", state, s, evidence.Pointer("state"))
+		if state != "published" {
+			d.Warnings = append(d.Warnings, s+": advisory state is "+state+", not published")
+		}
+	}
+	if withdrawn := str(a["withdrawn_at"]); withdrawn != "" {
+		d.Add("advisory_withdrawn", withdrawn, s, evidence.Pointer("withdrawn_at"))
+		d.Warnings = append(d.Warnings, s+": advisory withdrawn at "+withdrawn+"; do not use as current evidence")
+	}
+	if summary := str(a["summary"]); summary != "" {
+		d.Add("advisory_summary", summary, s, evidence.Pointer("summary"))
+	}
+	if body := str(a["description"]); body != "" {
+		d.Add("advisory_description", body, s, evidence.Pointer("description"))
+	}
+	if severity := str(a["severity"]); severity != "" {
+		d.Add("advisory_severity", severity, s, evidence.Pointer("severity"))
+	}
+	scored := false
+	severities := object(a["cvss_severities"])
+	for _, version := range []string{"cvss_v3", "cvss_v4"} {
+		if m := object(severities[version]); m["vector_string"] != nil || m["score"] != nil {
+			d.Add("cvss", m, s, evidence.Pointer("cvss_severities", version))
+			scored = true
+		}
+	}
+	if m := object(a["cvss"]); !scored && (m["vector_string"] != nil || m["score"] != nil) {
+		d.Add("cvss", m, s, evidence.Pointer("cvss"))
+	}
+	for i, w := range list(a["cwes"]) {
+		d.Add("weakness", w, s, evidence.Pointer("cwes", i))
+	}
+	for i, v := range list(a["vulnerabilities"]) {
+		at := func(parts ...any) string { return evidence.Pointer(append([]any{"vulnerabilities", i}, parts...)...) }
+		pkg := object(v)["package"]
+		d.Add("affected", v, s, at())
+		patched := str(object(v)["patched_versions"])
+		if patched != "" {
+			d.AddNormalized("fixed", obj{"package": pkg, "version": patched}, patched, s, at("patched_versions"))
+		}
+		first, pointer := object(v)["first_patched_version"], at("first_patched_version")
+		fixed := str(first)
+		if fixed == "" {
+			fixed, pointer = str(object(first)["identifier"]), at("first_patched_version", "identifier")
+		}
+		if fixed != "" && fixed != patched {
+			d.AddNormalized("fixed", obj{"package": pkg, "version": fixed}, fixed, s, pointer)
+		}
+	}
+}
+
+// addKEV judges absence only from a catalog whose declared count matches its
+// entries; a truncated or malformed catalog cannot show that a CVE is absent.
+func addKEV(d *evidence.Document, k obj, id, s string) {
+	items, valid := k["vulnerabilities"].([]any)
+	if !valid || str(k["catalogVersion"]) == "" {
+		fail(d, s, "invalid KEV catalog")
+		return
+	}
+	count, isNumber := k["count"].(float64)
+	if !isNumber {
+		fail(d, s, "KEV catalog lacks count")
+		return
+	}
+	if int(count) != len(items) || count != float64(int(count)) {
+		fail(d, s, fmt.Sprintf("KEV catalog count %v does not match %d entries", count, len(items)))
+		return
+	}
+	matches := []int{}
+	for i, item := range items {
+		r, isObject := item.(map[string]any)
+		if !isObject || strings.TrimSpace(str(r["cveID"])) == "" {
+			fail(d, s, fmt.Sprintf("KEV catalog entry %d lacks cveID", i))
+			return
+		}
+		if str(r["cveID"]) == id {
+			matches = append(matches, i)
+		}
+	}
+	d.KEV.Status = evidence.NotFound
+	if len(matches) > 1 {
+		d.Warnings = append(d.Warnings, s+": CVE listed more than once in KEV catalog")
+	}
+	for _, i := range matches {
+		d.KEV.Status = evidence.OK
+		d.Add("known_exploitation", items[i], s, evidence.Pointer("vulnerabilities", i))
 	}
 }
 

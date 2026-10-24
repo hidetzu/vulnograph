@@ -243,7 +243,7 @@ func TestGoldenEvidence(t *testing.T) {
 		t.Fatal("normalized baseline differs from reviewed golden JSON")
 	}
 	versions := map[string]bool{}
-	for _, f := range d.Fixed {
+	for _, f := range d.Lookup(d.Fixed) {
 		var v map[string]any
 		if e := json.Unmarshal(f.Value, &v); e != nil {
 			t.Fatal(e)
@@ -290,7 +290,7 @@ func TestGlobalPatchedVersion(t *testing.T) {
 				t.Fatal("missing fixed version")
 			}
 			var value obj
-			json.Unmarshal(d.Fixed[0].Value, &value)
+			json.Unmarshal(d.Lookup(d.Fixed)[0].Value, &value)
 			if str(value["version"]) != "1.2.3" || str(object(value["package"])["name"]) != "test" {
 				t.Fatal(value)
 			}
@@ -316,7 +316,7 @@ func TestInvalidSourceHasNoFacts(t *testing.T) {
 					t.Fatal("invalid source accepted")
 				}
 			}
-			for _, facts := range [][]evidence.Fact{d.Facts, d.CVSS, d.Affected, d.Fixed} {
+			for _, facts := range [][]evidence.Fact{d.Facts, d.Lookup(d.CVSS), d.Lookup(d.Affected), d.Lookup(d.Fixed)} {
 				for _, f := range facts {
 					for _, id := range f.SourceIDs {
 						if id == tc.source {
@@ -374,7 +374,7 @@ func TestDialFallback(t *testing.T) {
 func TestWarningDeduplication(t *testing.T) {
 	p := copyFixture(t)
 	write(t, p, "cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"RESERVED"}}`)
-	write(t, p, "nvd", `{"vulnerabilities":[{"cve":{"id":"CVE-2026-0001"}},{"cve":{"id":"CVE-2026-0001"}}]}`)
+	write(t, p, "nvd", `{"vulnerabilities":[{"cve":{"id":"CVE-2026-0001","descriptions":[{"lang":"en","value":"A"}]}},{"cve":{"id":"CVE-2026-0001","descriptions":[{"lang":"en","value":"B"}]}}]}`)
 	d, e := (&Collector{Fixture: p}).Fetch(context.Background(), "CVE-2026-0001")
 	if e != nil {
 		t.Fatal(e)
