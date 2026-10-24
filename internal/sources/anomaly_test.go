@@ -80,6 +80,16 @@ func TestAnomalyFixtures(t *testing.T) {
 				t.Fatal("KEV without count treated as complete", s)
 			}
 		}},
+		{"kev-count-fraction", func(t *testing.T, d evidence.Document) {
+			if s := source(d, "cisa_kev"); s.Status != evidence.FetchFailed || s.Reason != "KEV catalog count is not a non-negative integer" || d.KEV.Status != evidence.Unknown {
+				t.Fatal("fractional KEV count truncated into a match", s)
+			}
+		}},
+		{"kev-count-negative", func(t *testing.T, d evidence.Document) {
+			if s := source(d, "cisa_kev"); s.Status != evidence.FetchFailed || d.KEV.Status != evidence.Unknown {
+				t.Fatal("negative KEV count accepted", s)
+			}
+		}},
 		{"kev-entry-without-cve", func(t *testing.T, d evidence.Document) {
 			if source(d, "cisa_kev").Status != evidence.FetchFailed || d.KEV.Status != evidence.Unknown || len(fields(d, "known_exploitation")) != 0 {
 				t.Fatal("malformed KEV catalog produced a signal")
@@ -107,6 +117,16 @@ func TestAnomalyFixtures(t *testing.T) {
 				t.Fatal("partial NVD result treated as complete", s)
 			}
 		}},
+		{"nvd-total-fraction", func(t *testing.T, d evidence.Document) {
+			if s := source(d, "nvd"); s.Status != evidence.FetchFailed || s.Reason != "NVD totalResults is not a non-negative integer" {
+				t.Fatal("fractional totalResults read as no NVD record", s)
+			}
+		}},
+		{"nvd-total-missing", func(t *testing.T, d evidence.Document) {
+			if s := source(d, "nvd"); s.Status != evidence.FetchFailed || len(fields(d, "nvd_status")) != 0 {
+				t.Fatal("NVD response without totalResults accepted", s)
+			}
+		}},
 		{"nvd-only-reserved", func(t *testing.T, d evidence.Document) {
 			if d.State != evidence.Unknown || source(d, "nvd").Status != evidence.FetchFailed || warned(d, "NVD has a record") {
 				t.Fatal("empty NVD record reported as usable", d.State, d.Warnings)
@@ -123,6 +143,16 @@ func TestAnomalyFixtures(t *testing.T) {
 		{"ghsa-id-mismatch", func(t *testing.T, d evidence.Document) {
 			if s := source(d, "ghsa"); s.Status != evidence.FetchFailed || s.Reason != "advisory GHSA ID mismatch" || len(d.Fixed) != 0 {
 				t.Fatal("advisory for another GHSA accepted", s)
+			}
+		}},
+		{"ghsa-id-missing", func(t *testing.T, d evidence.Document) {
+			if s := source(d, "ghsa"); s.Status != evidence.FetchFailed || s.Reason != "advisory lacks GHSA ID" || len(d.Fixed) != 0 {
+				t.Fatal("advisory without GHSA ID accepted", s, d.Fixed)
+			}
+		}},
+		{"ghsa-id-wrong-type", func(t *testing.T, d evidence.Document) {
+			if s := source(d, "ghsa"); s.Status != evidence.FetchFailed || s.Reason != "advisory lacks GHSA ID" || len(d.Fixed) != 0 {
+				t.Fatal("advisory with malformed GHSA ID accepted", s, d.Fixed)
 			}
 		}},
 		{"ghsa-duplicate-patch", func(t *testing.T, d evidence.Document) {

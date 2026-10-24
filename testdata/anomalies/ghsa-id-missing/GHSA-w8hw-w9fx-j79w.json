@@ -1,0 +1,5 @@
+{
+  "cve_id": "CVE-2026-0001",
+  "summary": "Synthetic advisory without an identifier",
+  "vulnerabilities": [{"package": {"name": "Synthetic"}, "patched_versions": "9.9"}]
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -262,11 +263,14 @@ func addNVD(d *evidence.Document, n obj, id, s string) {
 		fail(d, s, "missing NVD vulnerabilities array")
 		return
 	}
-	if total, ok := n["totalResults"]; ok {
-		if f, isNumber := total.(float64); !isNumber || int(f) != len(items) {
-			fail(d, s, "NVD totalResults does not match returned records")
-			return
-		}
+	total, isCount := count(n["totalResults"])
+	if !isCount {
+		fail(d, s, "NVD totalResults is not a non-negative integer")
+		return
+	}
+	if total != len(items) {
+		fail(d, s, "NVD totalResults does not match returned records")
+		return
 	}
 	for _, item := range items {
 		r := object(object(item)["cve"])
@@ -318,7 +322,10 @@ func addAdvisory(d *evidence.Document, a obj, id, ghsa, s string) {
 		fail(d, s, "advisory CVE mismatch")
 		return
 	}
-	if got := str(a["ghsa_id"]); got != "" && got != ghsa {
+	if got, isString := a["ghsa_id"].(string); !isString || got == "" {
+		fail(d, s, "advisory lacks GHSA ID")
+		return
+	} else if got != ghsa {
 		fail(d, s, "advisory GHSA ID mismatch")
 		return
 	}
@@ -374,6 +381,16 @@ func addAdvisory(d *evidence.Document, a obj, id, ghsa, s string) {
 	}
 }
 
+// count accepts only a JSON number that is a non-negative integer, so that a
+// fractional or negative declared size cannot be truncated into a match.
+func count(v any) (int, bool) {
+	f, isNumber := v.(float64)
+	if !isNumber || f < 0 || f != math.Trunc(f) || f > math.MaxInt32 {
+		return 0, false
+	}
+	return int(f), true
+}
+
 // addKEV judges absence only from a catalog whose declared count matches its
 // entries; a truncated or malformed catalog cannot show that a CVE is absent.
 func addKEV(d *evidence.Document, k obj, id, s string) {
@@ -382,13 +399,13 @@ func addKEV(d *evidence.Document, k obj, id, s string) {
 		fail(d, s, "invalid KEV catalog")
 		return
 	}
-	count, isNumber := k["count"].(float64)
-	if !isNumber {
-		fail(d, s, "KEV catalog lacks count")
+	declared, isCount := count(k["count"])
+	if !isCount {
+		fail(d, s, "KEV catalog count is not a non-negative integer")
 		return
 	}
-	if int(count) != len(items) || count != float64(int(count)) {
-		fail(d, s, fmt.Sprintf("KEV catalog count %v does not match %d entries", count, len(items)))
+	if declared != len(items) {
+		fail(d, s, fmt.Sprintf("KEV catalog count %d does not match %d entries", declared, len(items)))
 		return
 	}
 	matches := []int{}

@@ -1,0 +1,6 @@
+{
+  "ghsa_id": ["GHSA-w8hw-w9fx-j79w"],
+  "cve_id": "CVE-2026-0001",
+  "summary": "Synthetic advisory with a malformed identifier",
+  "vulnerabilities": [{"package": {"name": "Synthetic"}, "patched_versions": "9.9"}]
+}

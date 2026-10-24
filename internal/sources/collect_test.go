@@ -280,7 +280,7 @@ func TestGlobalPatchedVersion(t *testing.T) {
 		t.Run(fmt.Sprintf("%T", version), func(t *testing.T) {
 			p := copyFixture(t)
 			write(t, p, "cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"PUBLISHED"},"containers":{"cna":{"descriptions":[{"lang":"en","value":"Test"}],"references":[{"url":"https://github.com/advisories/GHSA-w8hw-w9fx-j79w"}]}}}`)
-			raw, _ := json.Marshal(obj{"cve_id": "CVE-2026-0001", "vulnerabilities": []any{obj{"package": obj{"name": "test"}, "first_patched_version": version}}})
+			raw, _ := json.Marshal(obj{"ghsa_id": "GHSA-w8hw-w9fx-j79w", "cve_id": "CVE-2026-0001", "vulnerabilities": []any{obj{"package": obj{"name": "test"}, "first_patched_version": version}}})
 			write(t, p, "GHSA-w8hw-w9fx-j79w", string(raw))
 			d, e := (&Collector{Fixture: p}).Fetch(context.Background(), "CVE-2026-0001")
 			if e != nil {
@@ -302,7 +302,7 @@ func TestInvalidSourceHasNoFacts(t *testing.T) {
 	for _, tc := range []struct{ key, body, source string }{
 		{"cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"PUBLISHED"},"containers":{"cna":{"descriptions":[]}}}`, "S1"},
 		{"cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"BOGUS"}}`, "S1"},
-		{"nvd", `{"vulnerabilities":[{"cve":{"id":"CVE-2026-0001","descriptions":[{"lang":"en","value":"Valid first entry"}]}},{"cve":{"id":"CVE-2026-9999"}}]}`, "S2"},
+		{"nvd", `{"totalResults":2,"vulnerabilities":[{"cve":{"id":"CVE-2026-0001","descriptions":[{"lang":"en","value":"Valid first entry"}]}},{"cve":{"id":"CVE-2026-9999"}}]}`, "S2"},
 	} {
 		t.Run(tc.key+tc.body, func(t *testing.T) {
 			p := copyFixture(t)
@@ -374,7 +374,7 @@ func TestDialFallback(t *testing.T) {
 func TestWarningDeduplication(t *testing.T) {
 	p := copyFixture(t)
 	write(t, p, "cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"RESERVED"}}`)
-	write(t, p, "nvd", `{"vulnerabilities":[{"cve":{"id":"CVE-2026-0001","descriptions":[{"lang":"en","value":"A"}]}},{"cve":{"id":"CVE-2026-0001","descriptions":[{"lang":"en","value":"B"}]}}]}`)
+	write(t, p, "nvd", `{"totalResults":2,"vulnerabilities":[{"cve":{"id":"CVE-2026-0001","descriptions":[{"lang":"en","value":"A"}]}},{"cve":{"id":"CVE-2026-0001","descriptions":[{"lang":"en","value":"B"}]}}]}`)
 	d, e := (&Collector{Fixture: p}).Fetch(context.Background(), "CVE-2026-0001")
 	if e != nil {
 		t.Fatal(e)
