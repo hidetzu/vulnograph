@@ -2,11 +2,21 @@
 
 Turn vulnerability data into visual understanding.
 
-CVE の公式情報を Go CLI で収集し、Agent Skill が出典付き日本語レポートと Mermaid の概念図を作成します。CLI に LLM 依存はありません。現在は **0.1.0-dev.1 相当の初期実装**です。
+English | [日本語](README.ja.md)
+
+[![ci](https://github.com/hidetzu/vulnograph/actions/workflows/ci.yml/badge.svg)](https://github.com/hidetzu/vulnograph/actions/workflows/ci.yml)
+
+vulnograph is a Go CLI that collects official information about a CVE into source-attributed evidence, plus an Agent Skill that turns that evidence into a Japanese report and Mermaid diagrams (a beginner-friendly overview and a technical detail diagram). The CLI has no LLM dependency: it collects and validates, and never interprets. The project is at **0.1.0-dev.1**, an early development release; expect breaking changes.
 
 ## Quick Start
 
-Go 1.24 以上。標準ライブラリのみで動きます。
+Requires Go 1.24 or later. Only the standard library is used.
+
+```bash
+go install github.com/hidetzu/vulnograph/cmd/vulnograph@v0.1.0-dev.1
+```
+
+Or build from a clone:
 
 ```bash
 go build -o vulnograph ./cmd/vulnograph
@@ -14,85 +24,106 @@ go build -o vulnograph ./cmd/vulnograph
 ./vulnograph fetch CVE-2026-109618 --format json
 ```
 
-ネットワークを使わず、保存済みデータで再現する場合:
+To reproduce from saved data without network access:
 
 ```bash
 ./vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618
 ```
 
-`--output` がなければ stdout に JSON、診断は stderr に出力します。新規出力ファイルは 0644、既存ファイルの更新時はそのアクセス権限を保持します。フラグは CVE ID の後に指定します。ID の小文字・前後空白は正規化します。
+Without `--output`, JSON goes to stdout and diagnostics to stderr. New output files are created with mode 0644; updating an existing file keeps its permissions. Flags go after the CVE ID. Lowercase IDs and surrounding whitespace are normalized.
 
-終了コードは `0`: CVE または NVD に利用可能なレコードあり（一部取得失敗を含む）、`1`: 基本レコード取得不能・REJECTED・入出力失敗、`2`: 引数エラーです。**終了コード 0 でも sources、warnings、state を必ず確認してください。** CVE 公式の公開状態が不明でも、NVD の情報だけで部分成功する場合があります。404 だけでは予約済みと未登録を区別できません。
+Exit codes:
 
-任意の認証情報は `NVD_API_KEY` と `GITHUB_TOKEN` から読みます。トークンをコマンド引数に入れないでください。GitHub トークンは GitHub API、NVD キーは NVD にのみ送ります。
+| Code | Meaning |
+| --- | --- |
+| `0` | A published CVE record, or an NVD record with a description, is available (other sources may have failed) |
+| `1` | No usable base record (for example only a RESERVED record, or an NVD record with only an ID), REJECTED, or an I/O failure |
+| `2` | Invalid arguments |
+
+**Always check `sources`, `warnings` and `state`, even when the exit code is 0.** A run can partially succeed from NVD alone when the official CVE publication state is unknown. An HTTP 404 alone does not distinguish a reserved CVE from a nonexistent one.
+
+Optional credentials are read from `NVD_API_KEY` and `GITHUB_TOKEN`. Do not pass tokens as command arguments. The GitHub token is sent only to the GitHub API, and the NVD key only to NVD.
 
 ## Skill
 
-単一の正本は [skills/vulnograph/SKILL.md](skills/vulnograph/SKILL.md) です。対象プロジェクトにリンクを作れます。既存の配置は上書きしません。
+The single canonical Skill is [skills/vulnograph/SKILL.md](skills/vulnograph/SKILL.md). The installer links it into a target project and never overwrites an existing entry.
 
 ```bash
 sh scripts/install-skill.sh codex /path/to/project
 sh scripts/install-skill.sh claude /path/to/project
 ```
 
-Codex は `.agents/skills`、Claude Code は `.claude/skills` に配置します。対象環境から CLI が利用できるよう PATH に追加するか、このリポジトリで `go run ./cmd/vulnograph` を使ってください。配置先が管理環境で書き込み禁止の場合は、書き込み可能なプロジェクトに配置します。
+Codex uses `.agents/skills` and Claude Code uses `.claude/skills`. Put the CLI on `PATH` for the target environment, or use `go run ./cmd/vulnograph` from this repository. If the target is read-only in a managed environment, install into a writable project instead.
 
-Codex では `$vulnograph`、Claude Code では `/vulnograph`、または自然文で「CVE-2026-109618 を vulnograph で図解して」と依頼します。利用環境の検出・権限設定に依存するため、同じスラッシュコマンドが両方で使えるとは仮定しません。配置と呼び出し方法は [Codex 公式](https://learn.chatgpt.com/docs/build-skills) と [Claude Code 公式](https://code.claude.com/docs/en/skills) を確認しています（2026-10-24）。
+Invoke it with `$vulnograph` in Codex, `/vulnograph` in Claude Code, or in natural language, such as "Explain CVE-2026-109618 with vulnograph". Discovery and permissions depend on the client, so do not assume the same slash command works in both. Installation paths and invocation were checked against the [Codex documentation](https://learn.chatgpt.com/docs/build-skills) and the [Claude Code documentation](https://code.claude.com/docs/en/skills) on 2026-10-24.
 
-出力先:
+Output:
 
 ```text
 reports/CVE-2026-109618/
   evidence.json
-  report.md
-  diagram.mmd
+  report.md      # Japanese report
+  overview.mmd   # For beginners: entry point -> root cause -> impact
+  diagram.mmd    # Technical detail: source-attributed causal chain
 ```
 
-[基準ケースのサンプル](examples/CVE-2026-109618/report.md) は固定取得データを元にこの実装作業中に Skill の手順で作成したものです。別の Claude Code セッションによる独立評価は未実施です。
+Every diagram node cites a Fact ID. An entry point or attack path that the sources do not state is drawn as "unknown" (不明); the AI does not fill it in.
+
+The [baseline sample](examples/CVE-2026-109618/report.md) was written from saved fixture data by following the Skill during development. It has not yet been evaluated independently in a separate Claude Code session. Its overview diagram (labels are in Japanese, as the Skill writes them):
 
 ```mermaid
-flowchart TD
-  A["リクエスト処理 F23/S3"] --> B["初期化途中に OOM F23/S3"]
-  B --> C["不正な状態が残る F23/S3"]
-  C --> D["終了処理が状態を参照 F23/S3"]
-  D --> E["mod_php で RCE 実証 F23/S3"]
-  D -.-> F["FPM は完全な攻撃未実証 F23/S3"]
+flowchart LR
+  subgraph IN["攻撃の入口"]
+    A["認証なしでネットワークから送るリクエスト F24/S3"]
+  end
+  subgraph CAUSE["脆弱性の原因"]
+    B["フォーム送信形式の本文でメモリを使い切らせる F24/S3"]
+    C["メモリ不足時の後始末が不完全で壊れた状態が残る F24/S3"]
+  end
+  subgraph HARM["被害"]
+    D["Web サーバーの実行権限でコードが動く mod_php で実証 F24/S3"]
+    E["PHP-FPM でも起こり得る 完全な攻撃は未実証 F24/S3"]
+  end
+  A --> B
+  B --> C
+  C --> D
+  C -.-> E
 ```
 
-## データ契約と情報源
+## Data contract and sources
 
-[Go の型定義](internal/evidence/evidence.go) が `schema_version: "0.1"` の正本です。互換性のない変更ではバージョンを変更し、[CHANGELOG](CHANGELOG.md) に記録します。
+The [Go type definitions](internal/evidence/evidence.go) are the source of truth for `schema_version: "0.2"`. Incompatible changes bump the version and are recorded in the [CHANGELOG](CHANGELOG.md).
 
-| 情報源 | 取得内容 |
+| Source | Collected |
 | --- | --- |
-| CVE Program API | 公開状態、説明、影響製品、CVSS、CWE、参照 URL |
-| NVD API 2.0 | 説明、CVSS、CWE、CPE 構成を原構造のまま保持 |
-| GitHub repository/global advisory API | CVE/NVD が参照する GHSA の説明、影響範囲、修正版 |
-| CISA KEV | 完全なカタログの取得に成功した場合のみ掲載有無を判定 |
-| FIRST EPSS | スコアと観測日 |
+| CVE Program API | Publication state, descriptions, affected products, CVSS, CWE, reference URLs |
+| NVD API 2.0 | Descriptions, CVSS, CWE and CPE configurations, kept in their original structure |
+| GitHub repository/global advisory API | For GHSAs referenced by CVE/NVD: description, severity, CVSS, CWE, affected ranges, patched versions, publication and withdrawal state |
+| CISA KEV | Listing status, decided only from a complete catalog whose `count` matches its entries |
+| FIRST EPSS | Score and observation date |
 
-Fact は ID、source_ids、原文の構造化値、フィールド位置を持ちます。sources は URL・取得日時・取得本文の SHA-256・公開日時（取得できた場合）を保持します。影響範囲を CLI が解釈して環境の脆弱性を判定することはありません。`cvss`、`affected`、`fixed` は facts の同じ ID の索引です。
+Each fact has an ID, `source_ids`, a value and a `source_pointer`, a JSON Pointer to its location in the retrieved response body. When a value is normalized (descriptions, patched versions, URLs), `original` keeps the value as it appears in the source. Each source records its URL, retrieval time, the SHA-256 of the retrieved body and, when available, its publication time. The CLI never interprets affected ranges to decide whether an environment is vulnerable. `cvss`, `affected` and `fixed` are arrays of Fact IDs (indexes); `facts` is the only place values are stored.
 
-| status | 意味 |
+| status | Meaning |
 | --- | --- |
-| ok | 取得・検証成功／シグナル掲載あり |
-| not_found | 当該情報源でレコード・掲載なし |
-| unknown | 判定不能、未取得、未公開等 |
-| fetch_failed | 通信、HTTP、JSON、応答検証の失敗 |
-| not_applicable | REJECTED などの非該当 |
+| ok | Retrieved and validated / listed in the signal |
+| not_found | No record or listing in that source |
+| unknown | Undetermined, not retrieved, unpublished, etc. |
+| fetch_failed | Network, HTTP, JSON or response validation failure, including count mismatches and records without content |
+| not_applicable | Not applicable, such as REJECTED |
 
-KEV／EPSS の取得失敗時、シグナルは unknown、対応する source は fetch_failed です。`conflicts` は同一言語の説明文の不一致候補を保持します。意味の矛盾かどうかは Skill／人間が確認します。自動的に片方へ統合しません。
+When KEV or EPSS cannot be retrieved, the signal is `unknown` and the corresponding source is `fetch_failed`. `conflicts` lists candidate mismatches between descriptions in the same language. Whether they are semantic conflicts is left to the Skill or a human; the CLI never merges them into one.
 
-## 制約と安全性
+## Limitations and safety
 
-- 任意ベンダー HTML の自動取得は未実装です。PHP の基準ケースは PHP 公式リポジトリの GHSA を取得します。その他の URL は未取得理由と共に記録します。本文内リンクの再帰巡回、GHSA の網羅検索、ADP コンテナの取り込みは行いません。
-- HTTPS・固定ホスト許可リスト・DNS 解決後の公開 IP 検証を使い、HTTP リダイレクトとプロキシ経由の取得を無効にしています。単一応答は 16 MiB、HTTP 要求は 30 秒、全体は 3 分、参照取得は 32 件までです。
-- ホストごとに通常 1 秒、NVD は無キー 6 秒／キーあり 600 ms の間隔を取り、429／5xx と通信失敗は最大 3 回試行します。Retry-After が 30 秒を超える場合は待たずに失敗を記録します。分散した複数プロセス間のレート制御はありません。
-- 外部データは非信頼です。含まれる命令やコードを実行しません。レポート・図は Skill が根拠を照合し、特殊文字・HTML を安全に処理する必要があります。CLI は元の説明を JSON 文字列として保持します。
-- KEV 未掲載は「悪用なし」ではありません。EPSS は観測日の推定値です。バックポートや実行形態を人間が確認してください。
-- ソース間の版範囲・CVSS の意味的矛盾検出、10〜20 CVE のレビュー、別クライアントでの Skill 評価は残作業です。[進捗と判断記録](docs/decisions.md) を参照してください。
+- Arbitrary vendor HTML is not fetched. The PHP baseline retrieves the GHSA from PHP's official repository; other URLs are recorded with the reason they were not fetched. The CLI does not follow links inside bodies, search GHSA exhaustively, or import ADP containers.
+- Requests use HTTPS, a fixed host allowlist and public-IP validation after DNS resolution; HTTP redirects and proxies are disabled. Limits: 16 MiB per response, 30 seconds per HTTP request, 3 minutes overall, 32 reference fetches.
+- Requests to the same host are spaced 1 second apart (NVD: 6 seconds without a key, 600 ms with one). HTTP 429/5xx and network failures are tried up to 3 times. A Retry-After over 30 seconds is recorded as a failure without waiting. There is no rate control across multiple processes.
+- External data is untrusted; instructions or code inside it are never executed. The Skill must check reports and diagrams against the evidence and handle special characters and HTML safely. The CLI keeps original descriptions as JSON strings.
+- Absence from KEV does not mean "not exploited". EPSS is an estimate as of its observation date. A human must check backports and deployment modes.
+- Remaining work: semantic comparison of version ranges and CVSS across sources, review against 10–20 CVEs, and Skill evaluation in other clients. See the [decision log](docs/decisions.md) (Japanese).
 
-## 開発
+## Development
 
 ```bash
 go test ./...
@@ -101,6 +132,10 @@ go vet ./...
 go build ./...
 ```
 
-固定フィクスチャ、部分成功、未知 CVE、API 制限、ネットワーク障害、信頼境界、基準ケースの SAPI 記述をテストします。CI は外部 API に依存しません。API のスナップショットは取得時の情報であり、現在の脆弱性情報を保証しません。
+Tests cover fixtures, partial success, unknown CVEs, API limits, network failures, trust boundaries, malformed inputs ([testdata/anomalies](testdata/anomalies)), traceability of every fact to its source location, and the safety and citations of the sample diagrams. CI does not depend on external APIs. The API snapshots reflect the time they were retrieved and do not represent current vulnerability information.
 
-ソースコードは MIT。testdata の外部 API スナップショットの内容の権利は各情報提供元に帰属します。
+See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and [SECURITY.md](SECURITY.md) to report a vulnerability in vulnograph itself.
+
+## License
+
+The source code is licensed under the [MIT License](LICENSE). Rights to the content of the external API snapshots in `testdata` and `examples` belong to their respective providers.
