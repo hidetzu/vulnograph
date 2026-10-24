@@ -12,13 +12,11 @@ vulnograph is a Go CLI that collects official information about a CVE into sourc
 
 Requires Go 1.24 or later. Only the standard library is used.
 
-```bash
-go install github.com/hidetzu/vulnograph/cmd/vulnograph@v0.1.0-dev.1
-```
-
-Or build from a clone:
+No release has been tagged yet, so build from a clone. The clone also provides the fixtures and the Skill.
 
 ```bash
+git clone https://github.com/hidetzu/vulnograph.git
+cd vulnograph
 go build -o vulnograph ./cmd/vulnograph
 ./vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
 ./vulnograph fetch CVE-2026-109618 --format json

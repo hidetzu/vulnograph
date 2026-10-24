@@ -10,13 +10,11 @@ CVE の公式情報を Go CLI で収集し、Agent Skill が出典付き日本�
 
 Go 1.24 以上。標準ライブラリのみで動きます。
 
-```bash
-go install github.com/hidetzu/vulnograph/cmd/vulnograph@v0.1.0-dev.1
-```
-
-またはクローンしてビルドします。
+まだリリースタグがないため、クローンしてビルドします。固定データと Skill もクローンに含まれます。
 
 ```bash
+git clone https://github.com/hidetzu/vulnograph.git
+cd vulnograph
 go build -o vulnograph ./cmd/vulnograph
 ./vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
 ./vulnograph fetch CVE-2026-109618 --format json
