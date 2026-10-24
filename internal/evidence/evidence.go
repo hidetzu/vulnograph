@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const SchemaVersion = "0.1"
+const SchemaVersion = "0.2"
 
 type Status string
 
@@ -43,12 +43,17 @@ type Source struct {
 	Reason      string    `json:"reason,omitempty"`
 	SHA256      string    `json:"sha256,omitempty"`
 }
+
+// Fact is one value taken from one source response. SourcePointer is an
+// RFC 6901 JSON Pointer into that response body; Original holds the value at
+// the pointer when Value is a normalized or extracted form of it.
 type Fact struct {
-	ID              string          `json:"id"`
-	Field           string          `json:"field"`
-	Value           json.RawMessage `json:"value"`
-	SourceIDs       []string        `json:"source_ids"`
-	EvidenceExcerpt string          `json:"evidence_excerpt"`
+	ID            string          `json:"id"`
+	Field         string          `json:"field"`
+	Value         json.RawMessage `json:"value"`
+	SourceIDs     []string        `json:"source_ids"`
+	SourcePointer string          `json:"source_pointer"`
+	Original      json.RawMessage `json:"original,omitempty"`
 }
 type Signal struct {
 	Status    Status   `json:"status"`
@@ -68,9 +73,9 @@ type Document struct {
 	FetchedAt     time.Time  `json:"fetched_at"`
 	Sources       []Source   `json:"sources"`
 	Facts         []Fact     `json:"facts"`
-	CVSS          []Fact     `json:"cvss"`
-	Affected      []Fact     `json:"affected"`
-	Fixed         []Fact     `json:"fixed"`
+	CVSS          []string   `json:"cvss"`
+	Affected      []string   `json:"affected"`
+	Fixed         []string   `json:"fixed"`
 	KEV           Signal     `json:"kev"`
 	EPSS          Signal     `json:"epss"`
 	Conflicts     []Conflict `json:"conflicts"`
@@ -78,19 +83,42 @@ type Document struct {
 }
 
 func New(id string, now time.Time) Document {
-	return Document{SchemaVersion: SchemaVersion, CVEID: id, State: Unknown, FetchedAt: now.UTC(), Sources: []Source{}, Facts: []Fact{}, CVSS: []Fact{}, Affected: []Fact{}, Fixed: []Fact{}, KEV: Signal{Status: Unknown, SourceIDs: []string{}}, EPSS: Signal{Status: Unknown, SourceIDs: []string{}}, Conflicts: []Conflict{}, Warnings: []string{}}
+	return Document{SchemaVersion: SchemaVersion, CVEID: id, State: Unknown, FetchedAt: now.UTC(), Sources: []Source{}, Facts: []Fact{}, CVSS: []string{}, Affected: []string{}, Fixed: []string{}, KEV: Signal{Status: Unknown, SourceIDs: []string{}}, EPSS: Signal{Status: Unknown, SourceIDs: []string{}}, Conflicts: []Conflict{}, Warnings: []string{}}
 }
-func (d *Document) Add(field string, value any, source string) {
+
+// Pointer builds an RFC 6901 JSON Pointer from object keys and array indexes.
+func Pointer(parts ...any) string {
+	var b strings.Builder
+	for _, p := range parts {
+		b.WriteString("/")
+		b.WriteString(strings.NewReplacer("~", "~0", "/", "~1").Replace(fmt.Sprint(p)))
+	}
+	return b.String()
+}
+
+// Add records a value exactly as it appears at pointer in the source body.
+func (d *Document) Add(field string, value any, source, pointer string) {
+	d.AddNormalized(field, value, nil, source, pointer)
+}
+
+// AddNormalized records a value derived from original, which is kept when the
+// two differ so readers can compare the normalization with the source text.
+func (d *Document) AddNormalized(field string, value, original any, source, pointer string) {
 	raw, _ := json.Marshal(value)
-	f := Fact{ID: fmt.Sprintf("F%d", len(d.Facts)+1), Field: field, Value: raw, SourceIDs: []string{source}, EvidenceExcerpt: "Structured source field: " + field}
+	f := Fact{ID: fmt.Sprintf("F%d", len(d.Facts)+1), Field: field, Value: raw, SourceIDs: []string{source}, SourcePointer: pointer}
+	if original != nil {
+		if o, _ := json.Marshal(original); string(o) != string(raw) {
+			f.Original = o
+		}
+	}
 	d.Facts = append(d.Facts, f)
 	switch field {
 	case "cvss":
-		d.CVSS = append(d.CVSS, f)
+		d.CVSS = append(d.CVSS, f.ID)
 	case "affected":
-		d.Affected = append(d.Affected, f)
+		d.Affected = append(d.Affected, f.ID)
 	case "fixed":
-		d.Fixed = append(d.Fixed, f)
+		d.Fixed = append(d.Fixed, f.ID)
 	}
 	if field != "description" {
 		return
@@ -112,4 +140,17 @@ func (d *Document) Add(field string, value any, source string) {
 			d.Conflicts = append(d.Conflicts, Conflict{Field: field, FactIDs: []string{prior.ID, f.ID}, Reason: "Source wording differs; semantic conflict requires human/Skill review."})
 		}
 	}
+}
+
+// Lookup resolves index IDs such as Document.Fixed to their facts.
+func (d *Document) Lookup(ids []string) []Fact {
+	facts := make([]Fact, 0, len(ids))
+	for _, id := range ids {
+		for _, f := range d.Facts {
+			if f.ID == id {
+				facts = append(facts, f)
+			}
+		}
+	}
+	return facts
 }

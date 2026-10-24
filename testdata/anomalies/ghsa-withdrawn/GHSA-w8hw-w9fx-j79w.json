@@ -1,0 +1,9 @@
+{
+  "ghsa_id": "GHSA-w8hw-w9fx-j79w",
+  "cve_id": "CVE-2026-0001",
+  "state": "published",
+  "withdrawn_at": "2026-10-20T00:00:00Z",
+  "summary": "Synthetic advisory",
+  "severity": "high",
+  "vulnerabilities": [{"package": {"name": "Synthetic"}, "patched_versions": "1.1"}]
+}

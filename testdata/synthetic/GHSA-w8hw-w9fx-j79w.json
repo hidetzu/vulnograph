@@ -1,4 +1,5 @@
 {
+  "ghsa_id": "GHSA-w8hw-w9fx-j79w",
   "cve_id": "CVE-2026-0001",
   "summary": "Synthetic advisory",
   "description": "Synthetic; not a real vulnerability.",

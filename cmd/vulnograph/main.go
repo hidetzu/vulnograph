@@ -90,9 +90,11 @@ func run(ctx context.Context, args []string, out, errout io.Writer) int {
 		fmt.Fprintln(errout, "output write failed")
 		return 1
 	}
-	usable := false
+	// A RESERVED record or an NVD response without content is retrieved but
+	// carries no vulnerability description, so it is not usable evidence.
+	usable := d.State == evidence.OK
 	for _, s := range d.Sources {
-		if (s.Kind == "cve_record" || s.Kind == "nvd") && s.Status == evidence.OK {
+		if s.Kind == "nvd" && s.Status == evidence.OK {
 			usable = true
 		}
 	}

@@ -1,0 +1,6 @@
+{
+  "ghsa_id": "GHSA-2222-3333-4444",
+  "cve_id": "CVE-2026-0001",
+  "summary": "Synthetic advisory for another GHSA",
+  "vulnerabilities": [{"package": {"name": "Synthetic"}, "patched_versions": "9.9"}]
+}

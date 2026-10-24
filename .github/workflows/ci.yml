@@ -11,7 +11,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - run: test -z "$(gofmt -l cmd internal)"
+      - run: test -z "$(gofmt -l cmd internal examples)"
       - run: go test -race ./...
       - run: go vet ./...
       - run: go build ./...
@@ -19,3 +19,4 @@ jobs:
         run: |
           go run ./cmd/vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618 > /tmp/evidence.json
           diff -u testdata/CVE-2026-109618/evidence.golden.json /tmp/evidence.json
+          diff -u testdata/CVE-2026-109618/evidence.golden.json examples/CVE-2026-109618/evidence.json

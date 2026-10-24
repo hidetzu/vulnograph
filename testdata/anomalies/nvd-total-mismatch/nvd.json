@@ -1,0 +1,6 @@
+{
+  "totalResults": 2,
+  "vulnerabilities": [
+    {"cve": {"id": "CVE-2026-0001", "vulnStatus": "Analyzed", "descriptions": [{"lang": "en", "value": "Synthetic memory issue."}]}}
+  ]
+}

@@ -1,0 +1,45 @@
+name: Data accuracy
+description: Evidence or a report misrepresents what a source says, or loses important information.
+labels: [accuracy]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for wrong, missing or misattributed facts, wrong source statuses, or diagrams that add claims not found in the sources.
+        Errors in the upstream data itself should be reported to the provider (CVE Program, NVD, GitHub, CISA or FIRST).
+  - type: input
+    id: cve
+    attributes:
+      label: CVE ID
+      placeholder: CVE-2026-109618
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where is the problem?
+      options:
+        - evidence.json (CLI)
+        - report.md (Skill)
+        - overview.mmd or diagram.mmd (Skill)
+    validations:
+      required: true
+  - type: textarea
+    id: claim
+    attributes:
+      label: What vulnograph says
+      description: Fact IDs, source IDs, or the sentence or diagram node involved.
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: What the source actually says
+      description: Link to the source and quote the relevant part.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `vulnograph --version`, or a commit SHA, and the evidence `fetched_at`.

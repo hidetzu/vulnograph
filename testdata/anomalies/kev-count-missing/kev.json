@@ -1,0 +1,6 @@
+{
+  "catalogVersion": "2026.10.24",
+  "vulnerabilities": [
+    {"cveID": "CVE-2025-0002", "vendorProject": "Synthetic"}
+  ]
+}

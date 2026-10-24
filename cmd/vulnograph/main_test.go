@@ -77,3 +77,41 @@ func TestOutputPermissions(t *testing.T) {
 		})
 	}
 }
+
+func overlay(t *testing.T, dirs ...string) string {
+	t.Helper()
+	p := t.TempDir()
+	for _, dir := range dirs {
+		es, e := os.ReadDir(dir)
+		if e != nil {
+			t.Fatal(e)
+		}
+		for _, f := range es {
+			b, e := os.ReadFile(filepath.Join(dir, f.Name()))
+			if e != nil {
+				t.Fatal(e)
+			}
+			if e := os.WriteFile(filepath.Join(p, f.Name()), b, 0600); e != nil {
+				t.Fatal(e)
+			}
+		}
+	}
+	return p
+}
+
+func TestEmptyNVDIsNotUsable(t *testing.T) {
+	p := overlay(t, "../../testdata/synthetic", "../../testdata/anomalies/nvd-only-reserved")
+	var out, err bytes.Buffer
+	if n := run(context.Background(), []string{"fetch", "CVE-2026-0001", "--fixture", p}, &out, &err); n != 1 || !json.Valid(out.Bytes()) {
+		t.Fatalf("NVD record without content counted as usable: %d %s", n, &err)
+	}
+	// A reserved CVE with a substantive NVD record remains a partial success.
+	p = overlay(t, "../../testdata/synthetic")
+	if e := os.WriteFile(filepath.Join(p, "cve.json"), []byte(`{"cveMetadata":{"cveId":"CVE-2026-0001","state":"RESERVED"}}`), 0600); e != nil {
+		t.Fatal(e)
+	}
+	out.Reset()
+	if n := run(context.Background(), []string{"fetch", "CVE-2026-0001", "--fixture", p}, &out, &err); n != 0 {
+		t.Fatalf("NVD evidence discarded for reserved CVE: %d %s", n, &err)
+	}
+}
