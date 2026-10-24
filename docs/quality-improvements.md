@@ -1,66 +1,35 @@
-# 0.1.0-dev.1 の品質改善
+# 0.1.0-dev.1 quality improvements
 
-2026-10-24、[PR #1](https://github.com/hidetzu/vulnograph/pull/1) の初期実装を、データの正確性、根拠の追跡性、レポートの理解しやすさの 3 つの観点で評価した結果と、改善項目 R1〜R7。機能の追加より情報の正確性と説明の品質を優先し、アーキテクチャ（CLI が出典付き evidence を作り、Skill が解釈・図解する）は維持した。番号は実装順で、[PR #2](https://github.com/hidetzu/vulnograph/pull/2) で実装した。
+On 2026-10-24, the initial implementation from [PR #1](https://github.com/hidetzu/vulnograph/pull/1) was reviewed for data accuracy, traceability of evidence, and clarity of reports. This page records the findings and the improvement items R1–R7, numbered in implementation order and implemented in [PR #2](https://github.com/hidetzu/vulnograph/pull/2). Accuracy and explanation quality took priority over new features, and the architecture was kept. The reasons for the resulting design are in [decisions.md](decisions.md).
 
-## 評価の要約
+## Findings
 
-- 取得失敗と「取得できたが中身がない」を区別していない経路がある。KEV は `count` を検証せず、NVD は ID だけのレコードでも `ok` になり、終了コード 0 の根拠になる。
-- Fact の `evidence_excerpt` は全件 `Structured source field: <field>` の定型文で、原文のどこから取ったかを示していない。
-- `cvss`／`affected`／`fixed` は `facts` の完全な複製で、golden の大半を占める。Skill に「重複を数えない」と書く必要があった。
-- GHSA の CVSS、CWE、深刻度、取り下げ状態を取り込んでいない。取り下げられたアドバイザリを有効な根拠として扱う恐れがある。
-- レポートの図は技術的な因果関係のみで、初心者が入口・原因・被害を把握する図がない。
+- Some paths did not distinguish a failed fetch from a fetch that returned nothing usable. KEV `count` was not validated, and an NVD record containing only an ID was `ok` and could justify exit code 0.
+- Every fact's `evidence_excerpt` was the fixed text `Structured source field: <field>`, which did not show where in the source the value came from.
+- `cvss`, `affected` and `fixed` were full copies of facts and made up most of the golden file.
+- GitHub advisory CVSS, CWE, severity and withdrawal were not collected, so a withdrawn advisory could be used as valid evidence.
+- The only diagram described the technical causal chain; there was no diagram that let beginners see the entry point, cause and impact.
 
-## 優先1：データの正確性
+## Priority 1: data accuracy
 
-### R1 KEV カタログの件数と配列の整合性を検証する
+**R1. Validate the KEV catalog count against its entries.** A missing or mismatched `count`, or an entry without a `cveID`, makes the source `fetch_failed` and the KEV signal `unknown`. A duplicate listing produces a warning.
 
-- `count` が欠落、または `vulnerabilities` の件数と不一致なら `fetch_failed`、KEV シグナルは `unknown`。
-- 要素がオブジェクトでない、`cveID` が空の要素を含む場合も不完全なカタログとして扱う。
-- 同一 CVE の重複掲載は警告する。
-- 回帰テスト: 件数不一致、件数欠落、不正要素の固定フィクスチャ。
+**R2. Treat NVD responses without usable content as failures.** A `totalResults` that does not match the records, or a record without a description, is `fetch_failed` and adds no facts. Empty status, metrics and configurations are not recorded. Exit code 1 when neither the CVE record nor NVD provides usable evidence.
 
-### R2 NVD から実質的な情報が取得できない場合の成功判定を見直す
+**R3. Reproduce malformed input with fixtures.** Each case under `testdata/anomalies` overrides responses of the synthetic fixture, and a table-driven test checks the expected statuses and signals. See [testdata/README.md](../testdata/README.md).
 
-- `totalResults` と返却件数が不一致なら `fetch_failed`（ページング・切り詰めの可能性）。
-- 空でない説明文を持たないレコードは `fetch_failed`。fact を一切追加しない。
-- `vulnStatus`、`metrics`、`configurations` が空なら fact にしない（`null` の fact を作らない）。
-- CVE 公式が利用できず NVD も実質空の場合、終了コード 1。
-- 回帰テスト: 空レコード、件数不一致、CVE RESERVED と空 NVD の組合せでの終了コード。
+## Priority 2: traceability
 
-### R3 異常入力を固定フィクスチャで再現する
+**R4. Record each fact's location in its source (schema 0.2).** `evidence_excerpt` was replaced by `source_pointer`, a JSON Pointer into the retrieved body, and `original` for normalized values.
 
-- `testdata/anomalies/<ケース>/` に、synthetic へ上書きする応答ファイルを置く。テストはケース名ごとに期待するソース状態とシグナルを検証する。
-- インラインの文字列テストは維持し、実データに近い異常は fixture で追加する。
+**R5. Remove the duplication of facts (schema 0.2).** `cvss`, `affected` and `fixed` became arrays of Fact IDs.
 
-## 優先2：根拠の追跡性
+**R6. Collect the missing GitHub advisory information.** The advisory ID is checked against the reference; severity, CVSS, CWE, state and withdrawal are recorded; withdrawn or unpublished advisories produce warnings; identical patched versions are recorded once.
 
-### R4 Fact ごとに出典内のフィールド位置と原文を保持する（schema 0.2）
+## Priority 3: report clarity
 
-- `evidence_excerpt` を廃止し、`source_pointer`（取得本文に対する RFC 6901 JSON Pointer）を追加する。
-- 正規化・抽出した値（説明文の `lang`／`value`、修正版、URL の整形）は `original` に原文の値を保持する。値が原文と同一なら省略する。
+**R7. Add a beginner-friendly overview diagram.** The Skill writes `overview.mmd` (entry point, root cause, impact in plain language) in addition to the technical `diagram.mmd`. Every node cites a fact or is marked unknown, and tests check the sample's diagrams.
 
-### R5 facts と cvss／affected／fixed の重複を解消する（schema 0.2）
+Review of PR #2 led to further fixes before it was merged: requiring a well-formed advisory ID, accepting only integral counts, and separating the startup and post-startup attack paths in the sample diagrams.
 
-- `cvss`／`affected`／`fixed` を Fact ID の配列にする。値の正本は `facts` のみ。
-- 互換性のない変更のため `schema_version` を `0.2` にする。Skill を更新する。
-
-### R6 GHSA の重要な情報の欠落を補う
-
-- 応答の `ghsa_id` が参照 URL の ID と一致することを検証する。
-- 深刻度、CVSS（`cvss_severities`／旧 `cvss`）、CWE、`withdrawn_at`、repository advisory の `state` を fact にする。
-- 取り下げ済み、または `published` 以外の状態は警告する。Skill はこれを現行の根拠にしない。
-- `patched_versions` と `first_patched_version` が同じ値なら修正版を 1 件にする。
-- credits などの個人情報に近い項目は取り込まない。
-
-## 優先3：レポートの理解しやすさ
-
-### R7 初心者向け概要図を追加し、技術詳細図と分ける
-
-- Skill は `overview.mmd`（入口 → 原因 → 被害、平易な語、6 ノード程度）と従来の `diagram.mmd`（技術詳細・出典付き因果関係）を作る。
-- 両図とも各ノードに Fact ID を付ける。出典にない攻撃経路・入口は「不明」ノードとし、AI が補完しない。
-- サンプルを更新し、図の安全な構文・Fact ID の実在・レポートへの埋め込み一致をテストする。
-
-## 対象外（今回は実施しない）
-
-- 新しいベンダーアダプタ、ADP の取り込み、ソース間の意味的なバージョン比較。
-- 10〜20 CVE での実データレビュー、Skill の独立した評価（[decisions.md](decisions.md) の未完了項目）。
+Work not covered here is listed under [remaining work](design.md#remaining-work).
