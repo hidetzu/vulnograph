@@ -81,6 +81,8 @@ flowchart LR
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | 実際の悪用が確認されているか |
 | [FIRST EPSS](https://www.first.org/epss/) | 悪用される確率の推定値 |
 
+This product uses data from the NVD API but is not endorsed or certified by the NVD.（本製品は NVD API のデータを使用していますが、NVD の承認・認定を受けたものではありません。）CVE は The MITRE Corporation の商標です。各情報源の利用条件は [NOTICE](NOTICE) を参照してください。
+
 ## はじめに
 
 必要なもの:
@@ -93,10 +95,11 @@ flowchart LR
 ```bash
 git clone https://github.com/hidetzu/vulnograph.git
 cd vulnograph
-go build -o vulnograph ./cmd/vulnograph
+go install ./cmd/vulnograph   # $(go env GOPATH)/bin にインストール
+vulnograph --version
 ```
 
-`vulnograph` を `PATH` に置きます。置かない場合は、エージェントがこのリポジトリで `go run ./cmd/vulnograph` を使えます。
+Skill は `PATH` 上の `vulnograph` を実行するため、Claude Code や Codex を動かす環境で見つかる必要があります。`vulnograph --version` が見つからない場合は、`$(go env GOPATH)/bin` を `PATH` に追加してください。
 
 **2. Skill をインストールする。** レポートを依頼するプロジェクトにリンクを作ります。既存の配置は上書きしません。
 
@@ -104,6 +107,8 @@ go build -o vulnograph ./cmd/vulnograph
 sh scripts/install-skill.sh claude /path/to/project   # .claude/skills/vulnograph
 sh scripts/install-skill.sh codex /path/to/project    # .agents/skills/vulnograph
 ```
+
+リンク先はクローン内の Skill です。クローンは移動せずに残してください。移動・削除した場合は、リンクを削除してからインストーラを再実行します。別のマシンではこのリンクは使えません。
 
 **3. エージェントに依頼する。** そのプロジェクトで、Claude Code なら `/vulnograph`、Codex なら `$vulnograph` を使うか、普通の文で依頼します。
 
@@ -116,9 +121,9 @@ CVE-2026-109618 を vulnograph で図解して
 ## CLI だけを使う
 
 ```bash
-./vulnograph fetch CVE-2026-109618                    # evidence JSON を標準出力へ
-./vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
-./vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618   # 保存済みデータ、通信なし
+vulnograph fetch CVE-2026-109618                    # evidence JSON を標準出力へ
+vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
+vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618   # クローン内の保存済みデータ、通信なし
 ```
 
 フラグは CVE 番号の後に指定します。`--output` で新しく作るファイルの権限は 0644 で、既存のファイルは権限を保ちます。
@@ -163,4 +168,4 @@ vulnograph 自体の脆弱性の報告は [SECURITY.md](SECURITY.md)（英語）
 
 ## ライセンス
 
-ソースコードは [MIT License](LICENSE)。testdata と examples の保存済み API データの内容の権利は、各情報提供元に帰属します。
+ソースコードは [MIT License](LICENSE)。testdata と examples の保存済み API データは MIT License の対象外で、各情報提供元の利用条件に従います。出典、著作権表示、帰属表示は [NOTICE](NOTICE)（英語）を参照してください。

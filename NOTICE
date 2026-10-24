@@ -1,0 +1,73 @@
+vulnograph
+Copyright (c) 2026 vulnograph contributors
+
+The source code is licensed under the MIT License (see LICENSE).
+
+This repository also contains data obtained from the third-party sources
+below. API responses under testdata/ are stored unmodified; the evidence files
+under testdata/ and examples/ are derived from them, and the sample reports
+under examples/ summarize them. This data is not covered by the MIT License and
+remains subject to the terms of its providers. Evidence produced by the CLI
+contains the same kinds of data; follow these terms when you redistribute it.
+
+
+CVE Program
+-----------
+Files: testdata/CVE-2026-109618/cve.json and data derived from it
+Source: https://www.cve.org/ (CVE Services API, https://cveawg.mitre.org/)
+
+Copyright (c) 1999-2026, The MITRE Corporation. CVE is a trademark and the CVE
+logo is a registered trademark of The MITRE Corporation.
+
+CVE Usage: MITRE hereby grants you a perpetual, worldwide, non-exclusive,
+no-charge, royalty-free, irrevocable copyright license to reproduce, prepare
+derivative works of, publicly display, publicly perform, sublicense, and
+distribute Common Vulnerabilities and Exposures (CVE(TM)). Any copy you make for
+such purposes is authorized provided that you reproduce MITRE's copyright
+designation and this license in any such copy.
+
+Terms of Use: https://www.cve.org/Legal/TermsOfUse
+
+
+National Vulnerability Database (NVD)
+-------------------------------------
+Files: testdata/CVE-2026-109618/nvd.json and data derived from it
+Source: https://nvd.nist.gov/ (NVD API 2.0)
+
+This product uses data from the NVD API but is not endorsed or certified by
+the NVD.
+
+Terms of Use: https://nvd.nist.gov/developers/terms-of-use
+
+
+GitHub Security Advisory GHSA-w8hw-w9fx-j79w
+--------------------------------------------
+Files: testdata/CVE-2026-109618/GHSA-w8hw-w9fx-j79w.json and data derived from it
+Source: https://github.com/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w
+
+Repository security advisory published by the PHP project in the php/php-src
+repository, retrieved through the GitHub REST API. Its content belongs to its
+authors. Advisories in the GitHub Advisory Database, which the CLI may retrieve
+at run time, are licensed under CC BY 4.0
+(https://github.com/github/advisory-database).
+
+
+CISA Known Exploited Vulnerabilities Catalog
+--------------------------------------------
+Files: testdata/CVE-2026-109618/kev.json
+Source: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+
+Published by the Cybersecurity and Infrastructure Security Agency (CISA).
+
+
+FIRST Exploit Prediction Scoring System (EPSS)
+----------------------------------------------
+Files: testdata/CVE-2026-109618/epss.json and data derived from it
+Source: https://www.first.org/epss/
+
+EPSS data is published by FIRST. FIRST requests attribution when EPSS data is
+used in publications or products.
+
+
+The data under testdata/synthetic and testdata/anomalies is fictional and was
+written for tests.

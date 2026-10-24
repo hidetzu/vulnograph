@@ -82,6 +82,8 @@ Sources:
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | Whether the CVE is known to be exploited in the wild |
 | [FIRST EPSS](https://www.first.org/epss/) | Estimated probability of exploitation |
 
+This product uses data from the NVD API but is not endorsed or certified by the NVD. CVE is a trademark of The MITRE Corporation. See [NOTICE](NOTICE) for the terms of each source.
+
 ## Getting started
 
 You need:
@@ -94,10 +96,11 @@ You need:
 ```bash
 git clone https://github.com/hidetzu/vulnograph.git
 cd vulnograph
-go build -o vulnograph ./cmd/vulnograph
+go install ./cmd/vulnograph   # installs to $(go env GOPATH)/bin
+vulnograph --version
 ```
 
-Put the `vulnograph` binary on your `PATH`, or the agent can run `go run ./cmd/vulnograph` from this repository.
+The Skill runs `vulnograph` from your `PATH`, so it must be found there in the environment where Claude Code or Codex runs. If `vulnograph --version` is not found, add `$(go env GOPATH)/bin` to your `PATH`.
 
 **2. Install the Skill** into the project where you will ask for reports. This creates a link and never overwrites an existing entry.
 
@@ -105,6 +108,8 @@ Put the `vulnograph` binary on your `PATH`, or the agent can run `go run ./cmd/v
 sh scripts/install-skill.sh claude /path/to/project   # .claude/skills/vulnograph
 sh scripts/install-skill.sh codex /path/to/project    # .agents/skills/vulnograph
 ```
+
+The link points to the Skill in your clone, so keep the clone where it is. If you move or delete it, remove the link and run the installer again. The link does not work on another machine.
 
 **3. Ask the agent.** In that project, run `/vulnograph` in Claude Code or `$vulnograph` in Codex, or ask in plain words:
 
@@ -117,9 +122,9 @@ The report is written to `reports/<CVE-ID>/`.
 ## Using the CLI on its own
 
 ```bash
-./vulnograph fetch CVE-2026-109618                    # print evidence JSON to stdout
-./vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
-./vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618   # saved data, no network
+vulnograph fetch CVE-2026-109618                    # print evidence JSON to stdout
+vulnograph fetch CVE-2026-109618 --output reports/CVE-2026-109618/evidence.json
+vulnograph fetch CVE-2026-109618 --fixture testdata/CVE-2026-109618   # saved data in the clone, no network
 ```
 
 Flags go after the CVE ID. With `--output`, a new file is created with mode 0644, and an existing file keeps its permissions.
@@ -164,4 +169,4 @@ To report a vulnerability in vulnograph itself, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-The source code is licensed under the [MIT License](LICENSE). Rights to the content of the saved API data in `testdata` and `examples` belong to their respective providers.
+The source code is licensed under the [MIT License](LICENSE). The saved API data in `testdata` and `examples` is not covered by it and remains subject to its providers' terms; see [NOTICE](NOTICE) for sources, copyright and attribution.

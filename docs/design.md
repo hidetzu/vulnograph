@@ -70,7 +70,7 @@ The report structure, labels and diagram rules are defined in [SKILL.md](../skil
 | `go test`, `go vet` and `go build` pass | Done |
 | The CLI reproducibly writes sources, retrieval times, usable evidence and gaps as JSON | Done |
 | Tests cover network failure, unknown CVEs, API limits, partial success, malformed responses and source conflicts | Done |
-| The Skill runs from Claude Code or Codex and writes the report and diagrams | Open: the baseline sample follows the Skill's instructions, but running the installed Skill in each client has not been reviewed independently |
+| The Skill runs from Claude Code or Codex and writes the report and diagrams | Done (smoke test on 2026-10-24) |
 | For CVE-2026-109618, the report does not confuse the exploit demonstrated on mod_php with the unproven FPM case | Done, covered by tests |
 | No unsupported claims, wrong fixed versions, or mitigations described as complete fixes | Checked for the baseline only |
 | 10–20 CVEs of different types (RCE, SQL injection, XSS, DoS, …) reviewed, with errors turned into test cases | Open |
@@ -81,11 +81,29 @@ The report structure, labels and diagram rules are defined in [SKILL.md](../skil
 This is the single list of known open work.
 
 - Review reports for 10–20 CVEs of different types and add fixtures for the errors found.
-- Review Skill discovery, invocation and output independently in both Claude Code and Codex.
-- Check that the Mermaid diagrams render in a browser; there is no automated syntax check yet.
+- Check Mermaid syntax automatically; diagrams are currently rendered by hand.
 - Add more vendor adapters and keep evidence from CVE ADP containers.
 - Detect semantic differences in version ranges and scores between sources.
 - Validate user-generated reports and diagrams with the CLI (currently only the sample is checked by tests).
+
+## Pre-release smoke test (2026-10-24)
+
+Run on the commit prepared for 0.1.0-dev.1, outside the repository, with the CLI on `PATH` and the Skill installed by `scripts/install-skill.sh`.
+
+| Check | Result |
+| --- | --- |
+| Live fetch of CVE-2026-109618 | Exit 0; every supported source `ok`; facts identical to the saved fixture |
+| Live fetch of CVE-2021-44228 | Exit 0; KEV listed (`ok`) with the catalog entry as a fact |
+| Mermaid rendering (mermaid-cli 11.4.2) | README, sample and generated diagrams all render |
+| Claude Code 2.1.310: `/vulnograph CVE-2026-109618` | Skill found; live evidence, report and both diagrams written; every cited fact and source exists; diagrams embedded verbatim; mod_php and FPM paths kept separate |
+| Claude Code without the CLI on `PATH` | Stopped, wrote no files, and pointed to the installation steps |
+| Codex 0.163.0: `$vulnograph CVE-2026-109618` | Skill found; live evidence, report and both diagrams written; every cited fact and source exists; diagrams render; mod_php and FPM paths kept separate |
+| Codex without the CLI on `PATH` | Stopped, wrote no files, and pointed to the installation steps |
+
+The runs found two gaps in the Skill, both now fixed:
+
+- Claude Code cited a node with several sources as `F2,F24/S1,S3`, which does not say which fact came from which source.
+- Codex did not report the KEV status or the EPSS score because they are signals, not facts; the Skill did not say how to cite them.
 
 ## References
 
