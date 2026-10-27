@@ -35,3 +35,7 @@ Each entry records a decision, why it was made, and the alternatives that were n
 **Two diagrams with different purposes.** `overview.mmd` explains the entry point, root cause and impact in plain language; `diagram.mmd` traces the causal chain the sources describe. Combining both purposes in one diagram made it too technical for beginners and too vague for engineers.
 
 **Diagram accuracy is enforced by rules and tests, not by the CLI.** The Skill requires a fact citation or an "unknown" mark on every node, and forbids joining paths with different preconditions. Tests check the sample's citations, safe syntax, and that proven and unproven impacts do not share a path. Validating user-generated reports with the CLI is planned (see [remaining work](design.md#remaining-work)).
+
+## Project
+
+**Funding through GitHub Sponsors only, with nothing gated behind it.** Every feature stays free, and sponsorship does not buy support, priorities or deadlines, so that the project needs no license checks, paid tiers or extra services to maintain. The Sponsor button and one short section in each README are the only places it is mentioned.
