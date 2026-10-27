@@ -157,7 +157,7 @@ Even with exit code 0, read `warnings` and each source's `status` in the JSON: a
 - [Test data](testdata/README.md): where the fixtures come from
 - [Validation plan](docs/validation-plan.md): how report quality is reviewed before 0.1.0
 - [CHANGELOG](CHANGELOG.md)
-- [CVEを読む技術](https://zenn.dev/hidetzu/books/cve-reading-guide) (free book, Japanese): how to read a CVE by hand; its appendix uses vulnograph
+- [CVEを読む技術](https://zenn.dev/hidetzu/books/cve-reading-guide) (book, Japanese): how to read a CVE by hand; its appendix uses vulnograph
 
 ## Contributing
 
@@ -173,7 +173,7 @@ If you used vulnograph on a real CVE, a [usage feedback](https://github.com/hide
 
 ## Support
 
-vulnograph is free and will stay free; every feature is available to everyone. If it saves you time and you would like to support its development, you can [sponsor the author on GitHub](https://github.com/sponsors/hidetzu). Sponsorship does not come with support or feature commitments.
+vulnograph is published as free, open-source software. If it saves you time and you would like to support its development, you can [sponsor the author on GitHub](https://github.com/sponsors/hidetzu). Sponsorship does not come with support or feature commitments.
 
 ## License
 

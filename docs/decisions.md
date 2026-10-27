@@ -38,4 +38,4 @@ Each entry records a decision, why it was made, and the alternatives that were n
 
 ## Project
 
-**Funding through GitHub Sponsors only, with nothing gated behind it.** Every feature stays free, and sponsorship does not buy support, priorities or deadlines, so that the project needs no license checks, paid tiers or extra services to maintain. The Sponsor button and one short section in each README are the only places it is mentioned.
+**Funding through GitHub Sponsors only, with nothing tied to it.** vulnograph is published free of charge, and sponsorship does not buy support, features, priorities or deadlines, so that the project needs no license checks, paid tiers or extra services to maintain. The Sponsor button and one short section in each README are the only places it is mentioned.

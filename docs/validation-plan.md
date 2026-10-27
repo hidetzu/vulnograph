@@ -35,13 +35,29 @@ For each CVE, generate the report with the released CLI and Skill, then check it
 6. KEV, EPSS and CVSS are reported as separate signals, and absence from KEV is not read as "not exploited".
 7. Both diagrams render, and paths with different preconditions are not joined.
 
-Record the result of each CVE in one issue, using the "Data accuracy" template for each error found, so that the review history stays in GitHub.
+## Recording results
+
+The review history stays in GitHub issues, split in two:
+
+- **One tracking issue** for the whole review, with a row per CVE. Update the row when the CVE is reviewed again.
+
+  ```markdown
+  | CVE | vulnograph | Agent | Result | Errors |
+  | --- | --- | --- | --- | --- |
+  | CVE-YYYY-NNNN | 0.1.0-dev.1 | Claude Code 2.1.310 | Pass | |
+  | CVE-YYYY-NNNN | 0.1.0-dev.1 | Codex 0.163.0 | Fail | #NN |
+  ```
+
+  `vulnograph` is the output of `vulnograph --version`, or a commit SHA, and `Agent` is the client and its version. A CVE fails if any check above fails.
+- **A "Data accuracy" issue for each error found**, linked from the row. Close it when the fix and its test are merged, then review the CVE again and update the row.
+
+0.1.0 needs every row to pass.
 
 ## Turning errors into tests
 
 - An error in the evidence becomes a fixture under `testdata/anomalies`, or a new saved snapshot if the upstream data is real and needed in full.
 - An error in a report becomes a change to [SKILL.md](../skills/vulnograph/SKILL.md). If the report is kept as a sample under `examples`, its citations are checked by `go test ./examples`.
-- A CVE whose report needed no change is listed in the review issue; it does not need a fixture.
+- A CVE that passes needs only its row in the tracking issue, not a fixture.
 
 ## Time to understanding
 

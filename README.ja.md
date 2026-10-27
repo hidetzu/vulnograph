@@ -156,7 +156,7 @@ API の認証情報は任意で、環境変数 `NVD_API_KEY` と `GITHUB_TOKEN` 
 - [テストデータ](testdata/README.md)（英語）: fixture の出典
 - [検証計画](docs/validation-plan.md)（英語）: 0.1.0 までにレポート品質を確認する方法
 - [CHANGELOG](CHANGELOG.md)
-- [CVEを読む技術](https://zenn.dev/hidetzu/books/cve-reading-guide)（無料の本）: CVE を手で読む方法。付録で vulnograph を使います
+- [CVEを読む技術](https://zenn.dev/hidetzu/books/cve-reading-guide)（本）: CVE を手で読む方法。付録で vulnograph を使います
 
 ## 貢献
 
@@ -172,7 +172,7 @@ vulnograph 自体の脆弱性の報告は [SECURITY.md](SECURITY.md)（英語）
 
 ## 支援
 
-vulnograph は無料で、今後も無料です。すべての機能を誰でも使えます。時間の節約になり、開発を支援したいと思った方は、[GitHub Sponsors で作者を支援](https://github.com/sponsors/hidetzu)できます。支援にサポートや機能追加の約束は伴いません。
+vulnograph は無料のオープンソースソフトウェアとして公開しています。時間の節約になり、開発を支援したいと思った方は、[GitHub Sponsors で作者を支援](https://github.com/sponsors/hidetzu)できます。支援にサポートや機能追加の約束は伴いません。
 
 ## ライセンス
 

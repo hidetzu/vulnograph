@@ -8,7 +8,7 @@ All notable changes are recorded here. Versions follow [Semantic Versioning](htt
 
 - A validation plan for reviewing reports on 10–20 CVEs before 0.1.0.
 - A "Usage feedback" issue template for reporting whether a report helped with a real decision.
-- A Sponsor button and a short Support section in the README. All features remain free.
+- A Sponsor button and a short Support section in the README. Sponsorship does not come with support or feature commitments.
 
 ## [0.1.0-dev.1](https://github.com/hidetzu/vulnograph/releases/tag/v0.1.0-dev.1) - 2026-10-24
 
