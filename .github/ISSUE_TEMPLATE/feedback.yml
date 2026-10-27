@@ -1,0 +1,47 @@
+name: Usage feedback
+description: Tell us how vulnograph worked for a real CVE you looked into, good or bad.
+labels: [feedback]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This helps decide what to improve next. Do not include details of your own systems or anything confidential.
+        For a wrong or misleading value, use "Data accuracy" instead.
+  - type: input
+    id: cve
+    attributes:
+      label: CVE ID
+      placeholder: CVE-2026-109618
+  - type: textarea
+    id: task
+    attributes:
+      label: What were you trying to decide?
+      description: For example, whether to patch now, which versions to check, or how to explain the CVE to your team.
+    validations:
+      required: true
+  - type: dropdown
+    id: useful
+    attributes:
+      label: Did the report help with that decision?
+      options:
+        - "Yes"
+        - Partly
+        - "No"
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: What helped, and what was missing or hard to trust?
+    validations:
+      required: true
+  - type: input
+    id: time
+    attributes:
+      label: Time compared with reading the sources yourself (optional)
+      placeholder: about 10 minutes instead of 40
+  - type: input
+    id: version
+    attributes:
+      label: Version and agent
+      description: Output of `vulnograph --version`, and Claude Code or Codex.

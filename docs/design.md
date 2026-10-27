@@ -80,7 +80,7 @@ The report structure, labels and diagram rules are defined in [SKILL.md](../skil
 
 This is the single list of known open work.
 
-- Review reports for 10–20 CVEs of different types and add fixtures for the errors found.
+- Review reports for 10–20 CVEs of different types and add fixtures for the errors found, following the [validation plan](validation-plan.md).
 - Check Mermaid syntax automatically; diagrams are currently rendered by hand.
 - Add more vendor adapters and keep evidence from CVE ADP containers.
 - Detect semantic differences in version ranges and scores between sources.
