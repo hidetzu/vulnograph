@@ -21,10 +21,12 @@ type obj = map[string]any
 func object(v any) obj { m, _ := v.(map[string]any); return m }
 func list(v any) []any { a, _ := v.([]any); return a }
 func str(v any) string { s, _ := v.(string); return s }
-func (c *Collector) load(ctx context.Context, d *evidence.Document, key, kind, raw string) (any, string) {
+
+// retrieve fetches raw and prepares its source entry: ok with the body's
+// digest for an HTTP 200, not_found for a 404, fetch_failed otherwise.
+func (c *Collector) retrieve(ctx context.Context, d *evidence.Document, key, kind, raw string) (response, evidence.Source) {
 	s := evidence.Source{ID: fmt.Sprintf("S%d", len(d.Sources)+1), Kind: kind, Title: kind, URL: raw, RetrievedAt: d.FetchedAt, Status: evidence.FetchFailed}
 	r := c.get(ctx, key, raw)
-	var v any
 	if c.Fixture == "" {
 		s.RetrievedAt = time.Now().UTC()
 	}
@@ -33,18 +35,41 @@ func (c *Collector) load(ctx context.Context, d *evidence.Document, key, kind, r
 		s.Reason = r.Reason
 	case r.Code == 404:
 		s.Status = evidence.NotFound
-		s.Reason = "HTTP 404; does not distinguish reserved from nonexistent CVE"
+		s.Reason = "HTTP 404"
+		if kind == "cve_record" {
+			s.Reason += "; does not distinguish reserved from nonexistent CVE"
+		}
 	case r.Code != 200:
 		s.Reason = fmt.Sprintf("HTTP %d", r.Code)
-	case json.Unmarshal(r.Body, &v) != nil:
-		s.Reason = "invalid JSON response"
 	default:
 		s.Status = evidence.OK
 		s.SHA256 = digest(r.Body)
 	}
+	return r, s
+}
+
+// record appends a source and warns when it contributed nothing.
+func record(d *evidence.Document, s evidence.Source) {
+	d.Sources = append(d.Sources, s)
+	if s.Status != evidence.OK {
+		d.Warnings = append(d.Warnings, s.ID+": "+string(s.Status)+": "+s.Reason)
+	}
+}
+
+// load retrieves a JSON source and returns its decoded body, or nil when the
+// source is not usable.
+func (c *Collector) load(ctx context.Context, d *evidence.Document, key, kind, raw string) (any, string) {
+	r, s := c.retrieve(ctx, d, key, kind, raw)
+	var v any
+	if s.Status == evidence.OK && json.Unmarshal(r.Body, &v) != nil {
+		s.Status = evidence.FetchFailed
+		s.Reason = "invalid JSON response"
+		s.SHA256 = ""
+	}
 	if s.Status == evidence.OK && v == nil {
 		s.Status = evidence.FetchFailed
 		s.Reason = "null JSON response"
+		s.SHA256 = ""
 	}
 	if s.Status == evidence.OK {
 		m := object(v)
@@ -59,10 +84,7 @@ func (c *Collector) load(ctx context.Context, d *evidence.Document, key, kind, r
 			s.PublishedAt = &published
 		}
 	}
-	d.Sources = append(d.Sources, s)
-	if s.Status != evidence.OK {
-		d.Warnings = append(d.Warnings, s.ID+": "+string(s.Status)+": "+s.Reason)
-	}
+	record(d, s)
 	if s.Status != evidence.OK {
 		return nil, s.ID
 	}
@@ -188,7 +210,7 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 			continue
 		}
 		if advisory != "" && seen["cisco:"+advisory] {
-			unfetched(raw, "Advisory already retrieved from another reference")
+			unfetched(raw, "Same Cisco advisory as an earlier reference; see that source")
 			continue
 		}
 		if fetchedReferences >= 32 {
@@ -196,7 +218,6 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 			d.Warnings = append(d.Warnings, "reference fetch limit reached")
 			continue
 		}
-		fetchedReferences++
 		if advisory != "" {
 			seen["cisco:"+advisory] = true
 			path, reason := cisco.lookup(ctx, c, &d, advisory)
@@ -204,12 +225,14 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 				unfetched(raw, reason)
 				continue
 			}
+			fetchedReferences++
 			v, s = c.load(ctx, &d, advisory+".json", "csaf", ciscoCSAFBase+path)
 			if v != nil {
 				addCSAF(&d, object(v), id, advisory, s)
 			}
 			continue
 		}
+		fetchedReferences++
 		v, s = c.load(ctx, &d, key+".json", "ghsa", api)
 		if v == nil {
 			continue

@@ -118,11 +118,11 @@ When `defaultStatus` is absent or `unknown`, the record says nothing about the v
 
 A reference to a Cisco Security Advisory page (`sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-…`, or the older `tools.cisco.com` form) names the advisory but not where its machine-readable form lives. The CLI reads Cisco's CSAF index (`www.cisco.com/.well-known/csaf/index.txt`, recorded as a `csaf_index` source), looks the advisory up by its lower-cased ID, and retrieves the listed `year/<id>.json` document as a `csaf` source. The advisory web page itself is never fetched. An advisory missing from the index, or an index that fails to validate, leaves the reference as an unfetched `reference` with the reason.
 
-The document is validated before any fact is taken: `csaf_version` must be 2.x, `document.tracking.id` must equal the advisory ID in the reference (case-insensitively), and `vulnerabilities` must contain an entry whose `cve` is this CVE. Only the entries for this CVE are read, because one advisory may cover several CVEs with different product statuses. The facts and their pointers:
+The document is validated before any fact is taken: `csaf_version` must be `2.0` (the field layout read is the 2.0 one, so a 2.1 document is rejected rather than read with its weaknesses and scores missing), `document.tracking.id` must equal the advisory ID in the reference (case-insensitively), and `vulnerabilities` must contain an entry whose `cve` is this CVE. Only the entries for this CVE are read, because one advisory may cover several CVEs with different product statuses. The facts and their pointers:
 
 | Fact | From |
 | --- | --- |
-| `advisory_state` | `/document/tracking/status`. `final` is the published state; `draft` and `interim` produce a warning |
+| `advisory_state` | `/document/tracking/status`. `final` is the published state; `draft` and `interim` produce a warning, and a document without a status produces a warning and no `advisory_state` |
 | `advisory_severity` | `/document/aggregate_severity/text`, when present |
 | `advisory_summary` | The vulnerability entry's `title`, or `/document/title` when it has none |
 | `advisory_description` | The `text` of each note with category `summary` or `description`, in the document and in the entry |

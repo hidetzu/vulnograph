@@ -16,7 +16,8 @@ func TestCiscoAdvisoryID(t *testing.T) {
 		"https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-esa-afw-zqYJkjxp":           "cisco-sa-esa-afw-zqyjkjxp",
 		"https://tools.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-20180328-smi2/":                     "cisco-sa-20180328-smi2",
 		"https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-ftd-tls1.3-dos-dlxwfwgf":    "cisco-sa-ftd-tls1.3-dos-dlxwfwgf",
-		"http://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-x":                           "",
+		"http://tools.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-20170629-snmp":                       "cisco-sa-20170629-snmp",
+		"ftp://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-x":                            "",
 		"https://sec.cloudapps.cisco.com.evil.test/security/center/content/CiscoSecurityAdvisory/cisco-sa-x":                "",
 		"https://user@sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-x":                     "",
 		"https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-x/extra":                    "",
@@ -172,7 +173,7 @@ func TestCSAFDuplicateReference(t *testing.T) {
 			duplicate = s
 		}
 	}
-	if kinds["csaf"] != 1 || kinds["csaf_index"] != 1 || duplicate.Status != evidence.Unknown || !strings.Contains(duplicate.Reason, "already retrieved") {
+	if kinds["csaf"] != 1 || kinds["csaf_index"] != 1 || duplicate.Status != evidence.Unknown || !strings.Contains(duplicate.Reason, "earlier reference") {
 		t.Fatalf("duplicate advisory handling: %v %+v", kinds, duplicate)
 	}
 }
@@ -188,7 +189,7 @@ func TestContradictingProducts(t *testing.T) {
 		"under_investigation": []any{"D", "F", ""},
 		"recommended":         []any{"A", "B", "C", "E", "G"},
 	}
-	if got := strings.Join(contradictingProducts(status), ","); got != "B,C,D,F" {
+	if got := strings.Join(contradictingProducts(status), ","); got != "C,D,B,F" {
 		t.Fatal(got)
 	}
 	if got := contradictingProducts(obj{"known_affected": []any{"A"}, "fixed": []any{"B"}}); len(got) != 0 {

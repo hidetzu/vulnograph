@@ -198,6 +198,11 @@ func TestAnomalyFixtures(t *testing.T) {
 				t.Fatal("draft advisory not flagged", f, d.Warnings)
 			}
 		}},
+		{"csaf-status-missing", func(t *testing.T, d evidence.Document) {
+			if source(d, "csaf").Status != evidence.OK || len(fields(d, "advisory_state")) != 0 || !warned(d, "no tracking status") {
+				t.Fatal("missing tracking status not flagged", d.Warnings)
+			}
+		}},
 		{"csaf-product-undefined", func(t *testing.T, d evidence.Document) {
 			undefined := 0
 			for _, f := range d.Lookup(d.Affected) {

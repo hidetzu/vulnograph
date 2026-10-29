@@ -13,7 +13,7 @@ vulnograph treats every external response as untrusted data. This page describes
 | `www.cisa.gov` | The complete CISA KEV catalog |
 | `api.first.org` | FIRST EPSS score |
 
-GitHub advisories are fetched only when a reference URL has the exact form of a GitHub advisory page (`github.com/advisories/GHSA-…` or `github.com/<owner>/<repo>/security/advisories/GHSA-…`). Cisco advisories are fetched only when a reference URL has the exact form of a Cisco Security Advisory page (`sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-…` or the same path on `tools.cisco.com`); the page is not fetched, the advisory ID is looked up in Cisco's CSAF index and only the path the index lists is retrieved. Other references, including vendor web pages, are recorded with the reason they were not fetched. The CLI does not follow links inside response bodies, search for advisories exhaustively, or import CVE ADP containers.
+GitHub advisories are fetched only when a reference URL has the exact form of a GitHub advisory page (`github.com/advisories/GHSA-…` or `github.com/<owner>/<repo>/security/advisories/GHSA-…`). Cisco advisories are fetched only when a reference URL has the exact form of a Cisco Security Advisory page (`sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-…` or the same path on `tools.cisco.com`, with `https` or the `http` of older records); the page is not fetched, the advisory ID is looked up in Cisco's CSAF index and only the path the index lists is retrieved. Other references, including vendor web pages, are recorded with the reason they were not fetched. The CLI does not follow links inside response bodies, search for advisories exhaustively, or import CVE ADP containers.
 
 ## Connection limits
 
@@ -21,7 +21,7 @@ GitHub advisories are fetched only when a reference URL has the exact form of a 
 - Every DNS answer must be a public address before any connection is made; private, loopback, link-local and other special-use ranges are rejected. Each connection is pinned to a validated address.
 - HTTP redirects and proxies are disabled.
 - Every request identifies the CLI with the `User-Agent` `vulnograph/<version> (+https://github.com/hidetzu/vulnograph)`. The CLI never presents itself as a browser.
-- At most 16 MiB per response, 30 seconds per HTTP request, 3 minutes per run, and 32 advisory fetches per run (GitHub and Cisco together; the CSAF index is read once and not counted).
+- At most 16 MiB per response, 30 seconds per HTTP request, 3 minutes per run, and 32 advisory fetches per run (GitHub and Cisco together; the CSAF index is read once and not counted, and a Cisco advisory the index does not list is not counted either).
 
 ## Rate limits and retries
 

@@ -2,11 +2,9 @@ package sources
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/hidetzu/vulnograph/internal/evidence"
 )
@@ -22,10 +20,11 @@ var ciscoID = regexp.MustCompile(`^cisco-sa-[A-Za-z0-9_.-]{1,80}$`)
 var csafIndexEntry = regexp.MustCompile(`^[0-9]{4}/[a-z0-9_.-]+\.json$`)
 
 // ciscoAdvisoryID returns the lower-cased advisory ID named by a Cisco Security
-// Advisory page URL, or "" for any other URL.
+// Advisory page URL, or "" for any other URL. The page is never fetched, only
+// its ID is looked up, so the http form of old references is accepted too.
 func ciscoAdvisoryID(raw string) string {
 	u, e := url.Parse(raw)
-	if e != nil || u.Scheme != "https" || u.User != nil || (u.Host != "sec.cloudapps.cisco.com" && u.Host != "tools.cisco.com") {
+	if e != nil || (u.Scheme != "https" && u.Scheme != "http") || u.User != nil || (u.Host != "sec.cloudapps.cisco.com" && u.Host != "tools.cisco.com") {
 		return ""
 	}
 	p := strings.Split(strings.Trim(u.Path, "/"), "/")
@@ -61,27 +60,19 @@ func (x *ciscoIndex) lookup(ctx context.Context, c *Collector, d *evidence.Docum
 // loadCiscoIndex records the index as a source of its own, so that the path
 // each CSAF document was read from can be traced to a retrieved body.
 func (c *Collector) loadCiscoIndex(ctx context.Context, d *evidence.Document) (map[string]string, string) {
-	s := evidence.Source{ID: fmt.Sprintf("S%d", len(d.Sources)+1), Kind: "csaf_index", Title: "csaf_index", URL: ciscoIndexURL, RetrievedAt: d.FetchedAt, Status: evidence.FetchFailed}
-	r := c.get(ctx, "cisco-csaf-index.txt", ciscoIndexURL)
-	if c.Fixture == "" {
-		s.RetrievedAt = time.Now().UTC()
-	}
+	r, s := c.retrieve(ctx, d, "cisco-csaf-index.txt", "csaf_index", ciscoIndexURL)
 	var paths map[string]string
-	switch {
-	case r.Reason != "":
-		s.Reason = r.Reason
-	case r.Code != 200:
-		s.Reason = fmt.Sprintf("HTTP %d", r.Code)
-	default:
-		paths, s.Reason = parseCSAFIndex(r.Body)
-		if paths != nil {
-			s.Status = evidence.OK
-			s.SHA256 = digest(r.Body)
+	if s.Status == evidence.NotFound {
+		s.Status = evidence.FetchFailed
+	}
+	if s.Status == evidence.OK {
+		if paths, s.Reason = parseCSAFIndex(r.Body); paths == nil {
+			s.Status = evidence.FetchFailed
+			s.SHA256 = ""
 		}
 	}
-	d.Sources = append(d.Sources, s)
+	record(d, s)
 	if s.Status != evidence.OK {
-		d.Warnings = append(d.Warnings, s.ID+": "+string(s.Status)+": "+s.Reason)
 		return nil, "Cisco CSAF index unavailable"
 	}
 	return paths, ""
@@ -112,13 +103,27 @@ func parseCSAFIndex(b []byte) (map[string]string, string) {
 	return paths, ""
 }
 
-// addCSAF validates a CSAF 2.x advisory before taking facts from it: the
+// csafStatuses lists every CSAF product status with the group CSAF assigns it
+// to. A product may belong to one group only; recommended belongs to none and
+// is never a statement that the release contains the fix. The fixed group is
+// recorded as fixed facts, every other status as affected facts.
+var csafStatuses = []struct{ status, group string }{
+	{"known_affected", "affected"}, {"first_affected", "affected"}, {"last_affected", "affected"},
+	{"known_not_affected", "not_affected"},
+	{"under_investigation", "under_investigation"},
+	{"recommended", ""},
+	{"fixed", "fixed"}, {"first_fixed", "fixed"},
+}
+
+// addCSAF validates a CSAF 2.0 advisory before taking facts from it: the
 // document must carry the tracking ID the reference named and list the CVE.
+// The field layout read here is the 2.0 one (cwe, scores), so other versions
+// are rejected rather than read with their weaknesses and scores missing.
 // Only the vulnerability entries for this CVE are read, since one advisory
 // may cover several CVEs with different product statuses.
 func addCSAF(d *evidence.Document, a obj, id, advisory, s string) {
 	doc := object(a["document"])
-	if !strings.HasPrefix(str(doc["csaf_version"]), "2.") {
+	if str(doc["csaf_version"]) != "2.0" {
 		fail(d, s, "unsupported CSAF version")
 		return
 	}
@@ -144,7 +149,9 @@ func addCSAF(d *evidence.Document, a obj, id, advisory, s string) {
 		return
 	}
 	products := csafProducts(object(a["product_tree"]))
-	if status := str(tracking["status"]); status != "" {
+	if status := str(tracking["status"]); status == "" {
+		d.Warnings = append(d.Warnings, s+": CSAF document has no tracking status; treat as unpublished")
+	} else {
 		d.Add("advisory_state", status, s, evidence.Pointer("document", "tracking", "status"))
 		if status != "final" {
 			d.Warnings = append(d.Warnings, s+": advisory status is "+status+", not final")
@@ -184,11 +191,9 @@ func addCSAF(d *evidence.Document, a obj, id, advisory, s string) {
 				d.Warnings = append(d.Warnings, s+": CSAF product ID "+productID+" has contradicting statuses")
 			}
 		}
-		// recommended is a vendor recommendation, not a statement that the
-		// release contains the fix, so it is never read as fixed.
-		for _, status := range []string{"known_affected", "first_affected", "last_affected", "known_not_affected", "under_investigation", "recommended", "fixed", "first_fixed"} {
-			field := "affected"
-			if status == "fixed" || status == "first_fixed" {
+		for _, entry := range csafStatuses {
+			status, field := entry.status, "affected"
+			if entry.group == "fixed" {
 				field = "fixed"
 			}
 			for m, pid := range list(productStatus[status]) {
@@ -222,20 +227,22 @@ func addCSAF(d *evidence.Document, a obj, id, advisory, s string) {
 // (affected, not affected, fixed, under investigation). CSAF forbids this;
 // vulnograph keeps every statement and warns instead of choosing one.
 func contradictingProducts(productStatus obj) []string {
-	groups := map[string]string{"first_affected": "affected", "known_affected": "affected", "last_affected": "affected", "known_not_affected": "not_affected", "first_fixed": "fixed", "fixed": "fixed", "under_investigation": "under_investigation"}
 	seen := map[string]string{}
 	var order, contradicting []string
-	for _, status := range []string{"first_affected", "known_affected", "last_affected", "known_not_affected", "first_fixed", "fixed", "under_investigation"} {
-		for _, pid := range list(productStatus[status]) {
+	for _, entry := range csafStatuses {
+		if entry.group == "" {
+			continue
+		}
+		for _, pid := range list(productStatus[entry.status]) {
 			productID := str(pid)
 			if productID == "" {
 				continue
 			}
 			prior, listed := seen[productID]
 			if !listed {
-				seen[productID] = groups[status]
+				seen[productID] = entry.group
 				order = append(order, productID)
-			} else if prior != groups[status] && prior != "contradicting" {
+			} else if prior != entry.group && prior != "contradicting" {
 				seen[productID] = "contradicting"
 			}
 		}
