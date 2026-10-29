@@ -4,6 +4,15 @@ All notable changes are recorded here. Versions follow [Semantic Versioning](htt
 
 ## Unreleased
 
+### CLI
+
+- `fixed` facts are now also derived from the CVE record's version ranges: a version listed as unaffected, a `changes` entry to unaffected, and the `lessThan` of an affected range when the product's `defaultStatus` is `unaffected`. Each fact carries the vendor, product, branch and a `source_pointer` into the record. Bounds the record does not declare unaffected, `lessThanOrEqual`, wildcards and NVD CPE ranges are not read as fixes. In the CVE-2026-109618 baseline the record's four branches now appear as F4–F7 next to the GHSA values, so later fact IDs in the sample and golden evidence moved by four.
+- A new `affected_bound` fact records the `lessThan` of an affected range that the record does not declare unaffected (`defaultStatus` absent or `unknown`, as in Microsoft records). It has the shape of a `fixed` fact but is not indexed as one; the Skill presents it as an estimate, not a fix.
+
+### Skill
+
+- `fixed` is written as confirmed and `affected_bound` as an estimate with its premise; the two are never mixed in one column.
+
 ### Documentation and project
 
 - A validation plan for reviewing reports on 10–20 CVEs before 0.1.0.
