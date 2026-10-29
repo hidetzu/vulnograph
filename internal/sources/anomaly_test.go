@@ -159,12 +159,141 @@ func TestAnomalyFixtures(t *testing.T) {
 			if len(d.Fixed) != 1 {
 				t.Fatal("same patched version recorded twice", d.Fixed)
 			}
-			cvss := d.Lookup(d.CVSS)
+			cvss := []evidence.Fact{}
+			for _, f := range d.Lookup(d.CVSS) {
+				if f.SourceIDs[0] == source(d, "ghsa").ID {
+					cvss = append(cvss, f)
+				}
+			}
 			if len(cvss) != 1 || cvss[0].SourcePointer != "/cvss_severities/cvss_v4" {
 				t.Fatal("GHSA CVSS v4 lost or empty v3 recorded", cvss)
 			}
-			if w := fields(d, "weakness"); len(w) != 1 || w[0].SourcePointer != "/cwes/0" {
+			if w := fields(d, "weakness"); len(w) != 2 || w[0].SourcePointer != "/cwes/0" || w[0].SourceIDs[0] != source(d, "ghsa").ID {
 				t.Fatal("GHSA CWE lost", w)
+			}
+		}},
+		{"csaf-id-mismatch", func(t *testing.T, d evidence.Document) {
+			if s := source(d, "csaf"); s.Status != evidence.FetchFailed || s.Reason != "CSAF tracking ID mismatch" || len(fields(d, "advisory_note")) != 0 {
+				t.Fatal("CSAF document for another advisory accepted", s)
+			}
+		}},
+		{"csaf-id-missing", func(t *testing.T, d evidence.Document) {
+			if s := source(d, "csaf"); s.Status != evidence.FetchFailed || s.Reason != "CSAF document lacks tracking ID" {
+				t.Fatal("CSAF document without tracking ID accepted", s)
+			}
+		}},
+		{"csaf-cve-missing", func(t *testing.T, d evidence.Document) {
+			if s := source(d, "csaf"); s.Status != evidence.FetchFailed || s.Reason != "CSAF document does not list the CVE" || len(fields(d, "remediation")) != 0 {
+				t.Fatal("CSAF document for another CVE accepted", s)
+			}
+		}},
+		{"csaf-version-unsupported", func(t *testing.T, d evidence.Document) {
+			if s := source(d, "csaf"); s.Status != evidence.FetchFailed || s.Reason != "unsupported CSAF version" {
+				t.Fatal("non-2.x CSAF accepted", s)
+			}
+		}},
+		{"csaf-draft", func(t *testing.T, d evidence.Document) {
+			f := fields(d, "advisory_state")
+			if len(f) != 1 || string(f[0].Value) != `"draft"` || !warned(d, "draft, not final") {
+				t.Fatal("draft advisory not flagged", f, d.Warnings)
+			}
+		}},
+		{"csaf-status-missing", func(t *testing.T, d evidence.Document) {
+			if source(d, "csaf").Status != evidence.OK || len(fields(d, "advisory_state")) != 0 || !warned(d, "no tracking status") {
+				t.Fatal("missing tracking status not flagged", d.Warnings)
+			}
+		}},
+		{"csaf-product-undefined", func(t *testing.T, d evidence.Document) {
+			undefined := 0
+			for _, f := range d.Lookup(d.Affected) {
+				var v obj
+				json.Unmarshal(f.Value, &v)
+				if str(v["product_id"]) == "CSAFPID-404" || str(v["product_id"]) == "CSAFPID-405" {
+					undefined++
+					if v["name"] != nil || v["branches"] != nil {
+						t.Fatal("undefined product given a name", v)
+					}
+				}
+			}
+			if undefined != 2 || !warned(d, "CSAFPID-404 is not defined") || !warned(d, "CSAFPID-405 is not defined") || strings.Count(strings.Join(d.Warnings, "\n"), "CSAFPID-404") != 1 {
+				t.Fatal("undefined product ID not kept with one warning", undefined, d.Warnings)
+			}
+		}},
+		{"csaf-fixed-status", func(t *testing.T, d evidence.Document) {
+			fixed := d.Lookup(d.Fixed)
+			if len(fixed) != 3 || fixed[1].SourcePointer != "/vulnerabilities/0/product_status/fixed/0" || fixed[2].SourcePointer != "/vulnerabilities/0/product_status/first_fixed/0" {
+				t.Fatal("CSAF fixed statuses not indexed", fixed)
+			}
+			recommended := 0
+			for _, f := range d.Lookup(d.Affected) {
+				if strings.Contains(f.SourcePointer, "/recommended/") {
+					recommended++
+				}
+			}
+			if recommended != 2 || warned(d, "contradicting") {
+				t.Fatal("recommended releases not kept as their own status", recommended, d.Warnings)
+			}
+			var v obj
+			json.Unmarshal(fixed[1].Value, &v)
+			if str(v["status"]) != "fixed" || str(v["name"]) != "Synthetic Gateway Appliance" || string(fixed[1].Original) != `"CSAFPID-3"` {
+				t.Fatal("fixed product lost", v)
+			}
+		}},
+		{"csaf-multi-cve", func(t *testing.T, d evidence.Document) {
+			if f := fields(d, "advisory_summary"); len(f) != 2 || f[1].SourcePointer != "/vulnerabilities/1/title" || strings.Contains(string(f[1].Value), "Other issue") {
+				t.Fatal("entry for another CVE read", f)
+			}
+			statuses := 0
+			for _, f := range fields(d, "affected") {
+				if f.SourceIDs[0] != source(d, "csaf").ID {
+					continue
+				}
+				statuses++
+				if !strings.HasPrefix(f.SourcePointer, "/vulnerabilities/1/product_status/") {
+					t.Fatal("status of another CVE read", f)
+				}
+			}
+			if statuses != 3 {
+				t.Fatal("statuses for the CVE lost", statuses)
+			}
+		}},
+		{"csaf-status-contradiction", func(t *testing.T, d evidence.Document) {
+			statuses := map[string]int{}
+			for _, f := range d.Lookup(d.Affected) {
+				var v obj
+				json.Unmarshal(f.Value, &v)
+				if str(v["product_id"]) == "CSAFPID-1" {
+					statuses[str(v["status"])]++
+				}
+			}
+			if statuses["known_affected"] != 1 || statuses["known_not_affected"] != 1 || statuses["recommended"] != 1 {
+				t.Fatal("contradicting statements not both kept", statuses)
+			}
+			joined := strings.Join(d.Warnings, "\n")
+			if strings.Count(joined, "CSAFPID-1 has contradicting statuses") != 1 || strings.Contains(joined, "CSAFPID-2 has") || strings.Contains(joined, "CSAFPID-3 has") {
+				t.Fatal("contradiction warning wrong", d.Warnings)
+			}
+		}},
+		{"csaf-index-unlisted", func(t *testing.T, d evidence.Document) {
+			s := source(d, "reference")
+			for _, candidate := range d.Sources {
+				if strings.Contains(candidate.URL, "CiscoSecurityAdvisory") {
+					s = candidate
+				}
+			}
+			if source(d, "csaf_index").Status != evidence.OK || source(d, "csaf").ID != "" || s.Status != evidence.Unknown || s.Reason != "Advisory not listed in Cisco CSAF index" {
+				t.Fatal("unlisted advisory handling", s)
+			}
+		}},
+		{"csaf-index-malformed", func(t *testing.T, d evidence.Document) {
+			s := evidence.Source{}
+			for _, candidate := range d.Sources {
+				if strings.Contains(candidate.URL, "CiscoSecurityAdvisory") {
+					s = candidate
+				}
+			}
+			if i := source(d, "csaf_index"); i.Status != evidence.FetchFailed || i.Reason != "invalid CSAF index entry" || i.SHA256 != "" || source(d, "csaf").ID != "" || s.Reason != "Cisco CSAF index unavailable" {
+				t.Fatal("malformed index used", i, s)
 			}
 		}},
 	} {

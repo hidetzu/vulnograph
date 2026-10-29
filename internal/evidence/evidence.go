@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-const SchemaVersion = "0.2"
+const SchemaVersion = "0.3"
 
 type Status string
 

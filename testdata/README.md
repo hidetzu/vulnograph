@@ -18,7 +18,7 @@ These snapshots reflect the time they were retrieved, not current information. R
 
 ## synthetic: fictional baseline
 
-Fictional data for testing states and conflict candidates. It is not related to any real CVE that may use the same ID.
+Fictional data for testing states and conflict candidates. It is not related to any real CVE that may use the same ID. The CVE record references a fictional Cisco advisory, `cisco-sa-synthetic-AbCd`; `cisco-csaf-index.txt` is the CSAF index that lists it and `cisco-sa-synthetic-abcd.json` is its CSAF document, both in the form the CLI reads from Cisco's distribution.
 
 ## anomalies: malformed input
 
@@ -42,3 +42,15 @@ Each directory contains only the response files that override `synthetic`. The e
 | ghsa-id-missing | The advisory has no ID |
 | ghsa-id-wrong-type | The advisory ID is not a string |
 | ghsa-duplicate-patch | `patched_versions` and `first_patched_version` are the same |
+| csaf-id-mismatch | The CSAF tracking ID differs from the advisory in the reference URL |
+| csaf-id-missing | The CSAF document has no tracking ID |
+| csaf-cve-missing | The CSAF document lists a different CVE only |
+| csaf-version-unsupported | The CSAF version is not 2.x |
+| csaf-draft | The CSAF tracking status is `draft` |
+| csaf-status-missing | The CSAF document has no tracking status |
+| csaf-product-undefined | A product status names an ID the product tree does not define |
+| csaf-fixed-status | The CSAF document lists `fixed`, `first_fixed` and `recommended` products |
+| csaf-status-contradiction | The same product ID is listed as known affected and known not affected |
+| csaf-multi-cve | The CSAF document covers two CVEs with different product statuses |
+| csaf-index-unlisted | The CSAF index does not list the advisory |
+| csaf-index-malformed | The CSAF index contains a path outside the distribution |

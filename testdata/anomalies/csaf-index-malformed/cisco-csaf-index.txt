@@ -1,0 +1,2 @@
+2026/cisco-sa-synthetic-abcd.json
+../../etc/passwd
