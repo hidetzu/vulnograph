@@ -12,7 +12,7 @@ CVE 番号を渡すと、その脆弱性を説明するレポートと図を作�
 
 > [!NOTE]
 > - vulnograph はスキャナではありません。利用者の環境が脆弱かどうかは判定しません。
-> - 開発初期のリリース（0.1.0-dev.1）です。互換性のない変更が入る可能性があります。
+> - 開発初期のリリース（0.1.0-dev.2）です。互換性のない変更が入る可能性があります。
 
 ## 得られるもの
 
@@ -94,7 +94,7 @@ This product uses data from the NVD API but is not endorsed or certified by the 
 **1. CLI をインストールする。**
 
 ```bash
-go install github.com/hidetzu/vulnograph/cmd/vulnograph@v0.1.0-dev.1   # $(go env GOPATH)/bin にインストール
+go install github.com/hidetzu/vulnograph/cmd/vulnograph@v0.1.0-dev.2   # $(go env GOPATH)/bin にインストール
 vulnograph --version
 ```
 
@@ -103,7 +103,7 @@ Skill は `PATH` 上の `vulnograph` を実行するため、Claude Code や Cod
 **2. Skill をインストールする。** Skill はリポジトリに含まれるため、先にクローンします。インストーラはレポートを依頼するプロジェクトにリンクを作り、既存の配置は上書きしません。
 
 ```bash
-git clone --branch v0.1.0-dev.1 https://github.com/hidetzu/vulnograph.git
+git clone --branch v0.1.0-dev.2 https://github.com/hidetzu/vulnograph.git
 cd vulnograph
 sh scripts/install-skill.sh claude /path/to/project   # .claude/skills/vulnograph
 sh scripts/install-skill.sh codex /path/to/project    # .agents/skills/vulnograph

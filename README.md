@@ -13,7 +13,7 @@ It is meant for developers, infrastructure engineers and technical leads who nee
 > [!NOTE]
 > - Reports are currently written in **Japanese** only.
 > - vulnograph is not a scanner. It does not decide whether your environment is vulnerable.
-> - This is an early development release (0.1.0-dev.1). Expect breaking changes.
+> - This is an early development release (0.1.0-dev.2). Expect breaking changes.
 
 ## What you get
 
@@ -95,7 +95,7 @@ You need:
 **1. Install the CLI.**
 
 ```bash
-go install github.com/hidetzu/vulnograph/cmd/vulnograph@v0.1.0-dev.1   # installs to $(go env GOPATH)/bin
+go install github.com/hidetzu/vulnograph/cmd/vulnograph@v0.1.0-dev.2   # installs to $(go env GOPATH)/bin
 vulnograph --version
 ```
 
@@ -104,7 +104,7 @@ The Skill runs `vulnograph` from your `PATH`, so it must be found there in the e
 **2. Install the Skill** into the project where you will ask for reports. The Skill is in the repository, so clone it first. The installer creates a link and never overwrites an existing entry.
 
 ```bash
-git clone --branch v0.1.0-dev.1 https://github.com/hidetzu/vulnograph.git
+git clone --branch v0.1.0-dev.2 https://github.com/hidetzu/vulnograph.git
 cd vulnograph
 sh scripts/install-skill.sh claude /path/to/project   # .claude/skills/vulnograph
 sh scripts/install-skill.sh codex /path/to/project    # .agents/skills/vulnograph
