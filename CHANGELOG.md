@@ -2,7 +2,7 @@
 
 All notable changes are recorded here. Versions follow [Semantic Versioning](https://semver.org/); 0.1.0-dev.x releases may include incompatible changes.
 
-## Unreleased
+## [0.1.0-dev.2](https://github.com/hidetzu/vulnograph/releases/tag/v0.1.0-dev.2) - 2026-10-29
 
 ### CLI
 

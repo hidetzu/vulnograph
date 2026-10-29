@@ -105,6 +105,22 @@ The runs found two gaps in the Skill, both now fixed:
 - Claude Code cited a node with several sources as `F2,F24/S1,S3`, which does not say which fact came from which source.
 - Codex did not report the KEV status or the EPSS score because they are signals, not facts; the Skill did not say how to cite them.
 
+## Pre-release check (2026-10-29)
+
+Run on the commit prepared for 0.1.0-dev.2 with the CLI built from the repository. The Skill was not re-run end to end in Claude Code or Codex for this release; the CVE-2026-76519 report was rewritten in this repository following the Skill's rules and checked mechanically (every cited fact and source exists, diagrams embedded verbatim, fact/source pairs on every node consistent).
+
+| Check | Result |
+| --- | --- |
+| Live fetch of CVE-2026-76519 (Cisco Secure Email Gateway) | Exit 0; `csaf_index` and `csaf` `ok`; 24 product statuses, 10 notes, remediation and CVSS; one warning for a product ID the product tree does not define |
+| Live fetch of CVE-2026-20131 (Cisco FMC, single-CVE advisory) | Exit 0; 71 product statuses, all defined through relationships; no warnings |
+| Live fetch of CVE-2026-20338 (ClamAV advisory covering seven CVEs, status interim) | Exit 0; only the entry for this CVE read; warnings for the interim status and an undefined product ID |
+| Live fetch of CVE-2026-76418 (Cisco ASA/FTD, advisory published the day before) | Exit 0; 1,522 product statuses from software-on-platform relationships; evidence 1.1 MB |
+| Live fetch of CVE-2018-0171 (Cisco Smart Install, 2018 advisory) | Exit 0; the index resolved the 2018 directory; 416 product statuses |
+| Live fetch of CVE-2026-109619 (PHP, no Cisco reference) | Exit 0; unchanged GHSA path; 8 fixed versions |
+| Offline golden evidence for CVE-2026-109618 | Differs from 0.1.0-dev.1 only in `schema_version` |
+
+Observed and left for later: an advisory with many software-on-platform relationships produces a large evidence file; a way to summarize such product lists for the Skill is open work.
+
 ## References
 
 - CVE Program API: https://cveawg.mitre.org/api/cve/CVE-2026-109618 and https://github.com/CVEProject/cvelistV5
@@ -113,4 +129,5 @@ The runs found two gaps in the Skill, both now fixed:
 - GitHub repository advisories: https://docs.github.com/en/rest/security-advisories/repository-advisories
 - CISA KEV: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
 - FIRST EPSS API: https://api.first.org/epss/
+- OASIS CSAF 2.0: https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html and Cisco's CSAF distribution: https://www.cisco.com/.well-known/csaf/provider-metadata.json
 - Agent Skills: https://code.claude.com/docs/en/skills (Claude Code) and https://learn.chatgpt.com/docs/build-skills (Codex), checked on 2026-10-24
