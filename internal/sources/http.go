@@ -19,7 +19,11 @@ import (
 
 const maxBody = 16 << 20
 
-var hosts = map[string]bool{"cveawg.mitre.org": true, "services.nvd.nist.gov": true, "api.github.com": true, "www.cisa.gov": true, "api.first.org": true, "www.php.net": true}
+// userAgent names the CLI and where it comes from. Some CDNs refuse a bare
+// product token, so the comment with the project URL is part of the identity.
+var userAgent = "vulnograph/" + buildinfo.Version + " (+https://github.com/hidetzu/vulnograph)"
+
+var hosts = map[string]bool{"cveawg.mitre.org": true, "services.nvd.nist.gov": true, "api.github.com": true, "www.cisa.gov": true, "api.first.org": true, "www.php.net": true, "www.cisco.com": true}
 
 func safeURL(raw string) bool {
 	u, e := url.Parse(raw)
@@ -107,12 +111,14 @@ type Collector struct {
 	last        map[string]time.Time
 }
 
+// get retrieves raw, or in fixture mode reads the file named key from the
+// fixture directory instead.
 func (c *Collector) get(ctx context.Context, key, raw string) response {
 	if !safeURL(raw) {
 		return response{Reason: "URL not in supported HTTPS source allowlist"}
 	}
 	if c.Fixture != "" {
-		b, e := os.ReadFile(filepath.Join(c.Fixture, key+".json"))
+		b, e := os.ReadFile(filepath.Join(c.Fixture, key))
 		if e != nil {
 			return response{Reason: "fixture unavailable"}
 		}
@@ -143,7 +149,7 @@ func (c *Collector) get(ctx context.Context, key, raw string) response {
 		if e != nil {
 			return response{Reason: "invalid request"}
 		}
-		req.Header.Set("User-Agent", "vulnograph/"+buildinfo.Version)
+		req.Header.Set("User-Agent", userAgent)
 		req.Header.Set("Accept", "application/json")
 		if u.Hostname() == "services.nvd.nist.gov" && c.NVDKey != "" {
 			req.Header.Set("apiKey", c.NVDKey)

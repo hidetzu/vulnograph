@@ -52,6 +52,9 @@ func (c *Collector) load(ctx context.Context, d *evidence.Document, key, kind, r
 		if kind == "cve_record" {
 			published = str(object(m["cveMetadata"])["datePublished"])
 		}
+		if kind == "csaf" {
+			published = str(object(object(m["document"])["tracking"])["initial_release_date"])
+		}
 		if published != "" {
 			s.PublishedAt = &published
 		}
@@ -101,7 +104,7 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 		now = m.FetchedAt.UTC()
 	}
 	d := evidence.New(id, now)
-	v, s := c.load(ctx, &d, "cve", "cve_record", "https://cveawg.mitre.org/api/cve/"+id)
+	v, s := c.load(ctx, &d, "cve.json", "cve_record", "https://cveawg.mitre.org/api/cve/"+id)
 	record := object(v)
 	meta := object(record["cveMetadata"])
 	if v != nil {
@@ -154,15 +157,20 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 	} else if d.Sources[0].Status == evidence.NotFound {
 		d.State = evidence.NotFound
 	}
-	v, s = c.load(ctx, &d, "nvd", "nvd", "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId="+id)
+	v, s = c.load(ctx, &d, "nvd.json", "nvd", "https://services.nvd.nist.gov/rest/json/cves/2.0?cveId="+id)
 	if v != nil {
 		addNVD(&d, object(v), id, s)
 	}
-	// Only repository advisory API URLs derived from recognized GitHub references
-	// are fetched. Other references remain visible with a reason.
+	// Only advisory URLs derived from recognized references are fetched: GitHub
+	// advisory pages through the GitHub API, and Cisco advisory pages through
+	// Cisco's CSAF distribution. Other references remain visible with a reason.
 	refs := append([]evidence.Fact(nil), d.Facts...)
 	seen := map[string]bool{}
 	fetchedReferences := 0
+	cisco := &ciscoIndex{}
+	unfetched := func(raw, reason string) {
+		d.Sources = append(d.Sources, evidence.Source{ID: fmt.Sprintf("S%d", len(d.Sources)+1), Kind: "reference", Title: "Unfetched reference", URL: raw, RetrievedAt: now, Status: evidence.Unknown, Reason: reason})
+	}
 	for _, f := range refs {
 		if f.Field != "reference" {
 			continue
@@ -174,28 +182,46 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 		}
 		seen[raw] = true
 		api, key := advisoryURL(raw)
-		if api == "" {
-			d.Sources = append(d.Sources, evidence.Source{ID: fmt.Sprintf("S%d", len(d.Sources)+1), Kind: "reference", Title: "Unfetched reference", URL: raw, RetrievedAt: now, Status: evidence.Unknown, Reason: "Reference retained; unsupported adapter or unverified vendor"})
+		advisory := ciscoAdvisoryID(raw)
+		if api == "" && advisory == "" {
+			unfetched(raw, "Reference retained; unsupported adapter or unverified vendor")
+			continue
+		}
+		if advisory != "" && seen["cisco:"+advisory] {
+			unfetched(raw, "Advisory already retrieved from another reference")
 			continue
 		}
 		if fetchedReferences >= 32 {
-			d.Sources = append(d.Sources, evidence.Source{ID: fmt.Sprintf("S%d", len(d.Sources)+1), Kind: "reference", Title: "Unfetched reference", URL: raw, RetrievedAt: now, Status: evidence.Unknown, Reason: "Reference fetch limit reached"})
+			unfetched(raw, "Reference fetch limit reached")
 			d.Warnings = append(d.Warnings, "reference fetch limit reached")
 			continue
 		}
 		fetchedReferences++
-		v, s = c.load(ctx, &d, key, "ghsa", api)
+		if advisory != "" {
+			seen["cisco:"+advisory] = true
+			path, reason := cisco.lookup(ctx, c, &d, advisory)
+			if path == "" {
+				unfetched(raw, reason)
+				continue
+			}
+			v, s = c.load(ctx, &d, advisory+".json", "csaf", ciscoCSAFBase+path)
+			if v != nil {
+				addCSAF(&d, object(v), id, advisory, s)
+			}
+			continue
+		}
+		v, s = c.load(ctx, &d, key+".json", "ghsa", api)
 		if v == nil {
 			continue
 		}
 		addAdvisory(&d, object(v), id, key, s)
 	}
-	v, s = c.load(ctx, &d, "kev", "cisa_kev", "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json")
+	v, s = c.load(ctx, &d, "kev.json", "cisa_kev", "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json")
 	d.KEV.SourceIDs = []string{s}
 	if v != nil {
 		addKEV(&d, object(v), id, s)
 	}
-	v, s = c.load(ctx, &d, "epss", "first_epss", "https://api.first.org/data/v1/epss?cve="+id)
+	v, s = c.load(ctx, &d, "epss.json", "first_epss", "https://api.first.org/data/v1/epss?cve="+id)
 	d.EPSS.SourceIDs = []string{s}
 	if v != nil {
 		items, valid := object(v)["data"].([]any)

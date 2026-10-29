@@ -17,6 +17,9 @@
         },
         {
           "url": "https://vendor.example/advisory"
+        },
+        {
+          "url": "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-synthetic-AbCd"
         }
       ],
       "affected": [

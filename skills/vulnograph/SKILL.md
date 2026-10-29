@@ -25,7 +25,8 @@ CLI が失敗しても JSON が生成されていれば source status と warnin
 - `fixed` は出典が修正版と明言した値（GHSA の patched version、または CVE レコードが unaffected と宣言した版）であり、`確認済み` として書ける。`affected_bound` は CVE レコードの影響範囲の上限（`lessThan`）で、レコードはその版を unaffected と宣言していない。修正版として書くときは `推定` と明記し、前提が上限の読み替えであることと、ベンダー文書での確認を添える。`fixed` と `affected_bound` を同じ列に混ぜない。
 - Fact ID → source_ids → sources の URL・status・取得日時を追う。`source_pointer` は取得本文内の位置（JSON Pointer）。`original` があれば値は正規化済みであり、原文の主張は `original` で確認する。取得成功の一次情報に直接書かれた内容を「確認済み」とする。環境での攻撃成立を確認した意味にはしない。
 - `conflicts` は同一言語で異なる説明文を検出した候補であり、必ずしも意味の矛盾ではない。言語差、要約、更新時刻を考慮し、実際に不一致なら両方の主張と根拠を残す。
-- 技術的詳細は製品公式アドバイザリを優先する。GHSA であることだけで製品公式と認定せず、repository／発行元を確認する。`advisory_withdrawn` がある、または `advisory_state` が `published` 以外のアドバイザリは現行の根拠にせず、その状態を明記する。
+- 技術的詳細は製品公式アドバイザリを優先する。GHSA であることだけで製品公式と認定せず、repository／発行元を確認する。`advisory_withdrawn` がある、または `advisory_state` が `published`（GHSA）／`final`（CSAF）以外のアドバイザリは現行の根拠にせず、その状態を明記する。
+- `kind` が `csaf` の出典はベンダー（現在は Cisco）の CSAF 文書である。その `affected` には `status` があり、`known_affected` だけを影響ありとして書く。`known_not_affected` は影響なしの根拠、`under_investigation` は不明として扱う。製品名は `name` と `branches`（vendor → product_family → product_version など）から組み立てる。`fixed` は `product_status` の `fixed`／`first_fixed` だけから作られ、Cisco は修正リリースを `advisory_note`（title が Fixed Software）の本文に書くことが多い。本文から修正版を書くときは当該 `advisory_note` の Fact ID を引用し、CLI が構造化した値ではないことを明記する。`remediation` は対策の種別と内容、`threat` は悪用状況の記述で、いずれも出典の記述そのままである。
 - `unknown` は不足、`fetch_failed` は取得失敗、`not_found` は当該情報源で見つからなかったこと、`not_applicable` は非該当。KEV 未掲載を悪用なしと表現しない。CVSS、EPSS、KEV は別の指標として説明する。EPSS は観測日と推定確率であることを添える。
 - `kev` と `epss` は facts ではなく、取得元を `source_ids` に持つシグナルである。`status`、`score`、`as_of` はそのまま根拠として使い、Fact ID の代わりに source ID（例: `[S9]`）を引用する。KEV に掲載されている場合は `known_exploitation` の Fact も引用する。シグナルの status が `unknown` なら値を記載しない。
 - バージョン範囲は各ソースの製品・ブランチと組で扱う。異なるブランチの `<` 条件を単一の上限へ統合しない。ディストリビューションのバックポートを確認事項にする。
@@ -43,7 +44,7 @@ report.md は以下の順序にする。
 4. 攻撃・障害の因果関係（技術詳細図。diagram.mmd と同じ Mermaid を埋め込む）
 5. 成立条件（認証、実行形態、設定、未検証範囲）
 6. 起こり得る被害（観測済みと可能性を分け、実行権限を限定）
-7. 影響・修正バージョン（ブランチごと、`fixed` は確認済み、`affected_bound` は推定、バックポートの注意）
+7. 影響・修正バージョン（ブランチごと、`fixed` は確認済み、`affected_bound` は推定、CSAF の `advisory_note` 本文に基づく修正版はその旨を明記、バックポートの注意）
 8. 対策（恒久対策優先、緩和策の限界）
 9. 確認事項（人間による環境確認）
 10. 出典・未確認事項（source ID、URL、取得日時、欠落・矛盾）

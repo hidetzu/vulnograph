@@ -14,11 +14,13 @@ Each entry records a decision, why it was made, and the alternatives that were n
 
 **CVE Program as the base record, NVD as supplementary.** NVD CPE configurations and CVSS metrics are kept in their original structure rather than flattened, so that no interpretation is introduced during collection.
 
-**Only GitHub advisories referenced by the CVE are fetched as advisories.** Fetching arbitrary vendor HTML was rejected: it widens both the work of verifying sources and the SSRF attack surface. Unsupported reference URLs are kept with the reason they were not fetched, and keep their query and fragment so that they point to exactly what the source cited.
+**Only advisories referenced by the CVE are fetched, and only in structured form.** GitHub advisories are read through the GitHub API and Cisco advisories through Cisco's CSAF 2.0 distribution. Fetching arbitrary vendor HTML was rejected: it widens both the work of verifying sources and the SSRF attack surface. Unsupported reference URLs are kept with the reason they were not fetched, and keep their query and fragment so that they point to exactly what the source cited.
+
+**A CSAF document is located through the publisher's index, not guessed.** Cisco files each advisory under the year of its first release, which a later reference cannot know. The CLI reads the index once per run, records it as a source with its digest, and retrieves only the path the index lists for the advisory ID. An index entry that is not a year directory and a lower-case file name is rejected as a whole.
 
 **A response is validated completely before any fact is taken from it.** This prevents partial facts from a source that later fails validation.
 
-**Retrieved and usable are different states.** A response can be retrieved yet carry no evidence. A KEV catalog is used to decide absence only when its declared `count` is a non-negative integer that matches its entries. An NVD response must have an integral `totalResults` matching its records, and every record must have a description. A GitHub advisory must carry a `ghsa_id` that matches the reference. A RESERVED CVE record alone does not count as usable evidence, so the CLI exits with 1.
+**Retrieved and usable are different states.** A response can be retrieved yet carry no evidence. A KEV catalog is used to decide absence only when its declared `count` is a non-negative integer that matches its entries. An NVD response must have an integral `totalResults` matching its records, and every record must have a description. A GitHub advisory must carry a `ghsa_id` that matches the reference. A CSAF document must carry the tracking ID the reference named and list the CVE; only its entries for that CVE are read, and a product ID the product tree does not define is kept with a warning rather than silently named. A RESERVED CVE record alone does not count as usable evidence, so the CLI exits with 1.
 
 **The complete KEV catalog is used, and saved in full as a fixture.** A reduced fixture would misrepresent an incomplete catalog as complete, which is exactly the failure that absence decisions must avoid.
 

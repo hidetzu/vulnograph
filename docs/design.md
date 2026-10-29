@@ -33,7 +33,7 @@ The intended readers are not only security specialists but developers, infrastru
 | --- | --- |
 | CVE Program | Base record: publication state, description, references |
 | NVD | Supplementary public analysis: CVSS, CWE, CPE configurations |
-| Product or project security advisories | Highest priority for technical details: cause, conditions, fixed versions, workarounds. Currently fetched only when published as a GitHub advisory referenced by the CVE |
+| Product or project security advisories | Highest priority for technical details: cause, conditions, fixed versions, workarounds. Currently fetched when published as a GitHub advisory, or as a Cisco Security Advisory in CSAF form, referenced by the CVE |
 | GitHub Security Advisories | Packages, fixed versions and technical descriptions |
 | CISA KEV | Separate signal: known exploitation |
 | FIRST EPSS | Separate signal: estimated exploitation probability |

@@ -78,6 +78,7 @@ flowchart LR
 | [CVE Program](https://www.cve.org/) | CVE の公式レコード: 公開状態、説明、影響製品、CVSS、CWE、参照先 |
 | [NVD](https://nvd.nist.gov/) | NIST の分析: CVSS、CWE、影響を受ける構成（CPE） |
 | [GitHub Security Advisories](https://github.com/advisories)（GHSA） | CVE が参照するアドバイザリ（多くはプロジェクト自身が発行）: 詳細、影響・修正バージョン |
+| [Cisco Security Advisories](https://sec.cloudapps.cisco.com/security/center/publicationListing.x)（CSAF） | CVE が参照する Cisco のアドバイザリを Cisco の CSAF 配布から取得: 影響あり・なしのリリース、修正ソフトウェア、回避策、悪用に関する記述 |
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | 実際の悪用が確認されているか |
 | [FIRST EPSS](https://www.first.org/epss/) | 悪用される確率の推定値 |
 

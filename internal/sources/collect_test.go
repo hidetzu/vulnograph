@@ -175,6 +175,11 @@ func TestTrustBoundary(t *testing.T) {
 			t.Fatal("unsafe IP", s)
 		}
 	}
+	for _, s := range []string{"https://www.cisco.com.evil.test/.well-known/csaf/index.txt", "https://www.cisco.com:8443/.well-known/csaf/index.txt"} {
+		if safeURL(s) {
+			t.Fatal("unsafe URL", s)
+		}
+	}
 	for _, s := range []string{"https://github.com/../../security/advisories/GHSA-w8hw-w9fx-j79w", "https://github.com.evil.test/php/php-src/security/advisories/GHSA-w8hw-w9fx-j79w"} {
 		if u, _ := advisoryURL(s); u != "" {
 			t.Fatal(u)

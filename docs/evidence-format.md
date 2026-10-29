@@ -34,7 +34,7 @@ The document only records what each source says. It never merges differing state
 }
 ```
 
-`kind` is one of `cve_record` (CVE Program API), `nvd` (NVD API 2.0), `ghsa` (GitHub Security Advisory), `cisa_kev`, `first_epss` or `reference`. A `reference` is a URL listed by a CVE or NVD record that vulnograph does not fetch; it is kept with its `reason` so readers can follow it themselves. `sha256` is the digest of the retrieved body, and `reason` explains any status other than `ok`.
+`kind` is one of `cve_record` (CVE Program API), `nvd` (NVD API 2.0), `ghsa` (GitHub Security Advisory), `csaf` (a vendor advisory in CSAF 2.0 form, currently Cisco), `csaf_index` (the directory index used to locate a CSAF document; it contributes no facts), `cisa_kev`, `first_epss` or `reference`. A `reference` is a URL listed by a CVE or NVD record that vulnograph does not fetch; it is kept with its `reason` so readers can follow it themselves. `sha256` is the digest of the retrieved body, and `reason` explains any status other than `ok`.
 
 ### Status
 
@@ -70,9 +70,9 @@ A response is validated completely before any fact is taken from it, so a failed
 | `source_pointer` | [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) to the value's location in that source's retrieved body |
 | `original` | Present only when `value` is normalized or extracted; the value exactly as it appears at `source_pointer` |
 
-Fields: `publication_state`, `description`, `affected`, `fixed`, `affected_bound`, `cvss`, `weakness`, `reference`, `nvd_status`, `advisory_summary`, `advisory_description`, `advisory_severity`, `advisory_state`, `advisory_withdrawn` and `known_exploitation`. Values such as CVSS metrics and NVD CPE configurations are kept in their original structure rather than flattened.
+Fields: `publication_state`, `description`, `affected`, `fixed`, `affected_bound`, `cvss`, `weakness`, `reference`, `nvd_status`, `advisory_summary`, `advisory_description`, `advisory_note`, `advisory_severity`, `advisory_state`, `advisory_withdrawn`, `remediation`, `threat` and `known_exploitation`. Values such as CVSS metrics and NVD CPE configurations are kept in their original structure rather than flattened.
 
-Do not use an advisory with `advisory_withdrawn`, or with an `advisory_state` other than `published`, as current evidence.
+Do not use an advisory with `advisory_withdrawn`, or with an `advisory_state` other than `published` (GitHub) or `final` (CSAF), as current evidence.
 
 ### Fixed versions
 
@@ -113,6 +113,51 @@ When `defaultStatus` is absent or `unknown`, the record says nothing about the v
   "original": "10.0.26100.9711"
 }
 ```
+
+### Vendor advisories (CSAF)
+
+A reference to a Cisco Security Advisory page (`sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-…`, or the older `tools.cisco.com` form) names the advisory but not where its machine-readable form lives. The CLI reads Cisco's CSAF index (`www.cisco.com/.well-known/csaf/index.txt`, recorded as a `csaf_index` source), looks the advisory up by its lower-cased ID, and retrieves the listed `year/<id>.json` document as a `csaf` source. The advisory web page itself is never fetched. An advisory missing from the index, or an index that fails to validate, leaves the reference as an unfetched `reference` with the reason.
+
+The document is validated before any fact is taken: `csaf_version` must be 2.x, `document.tracking.id` must equal the advisory ID in the reference (case-insensitively), and `vulnerabilities` must contain an entry whose `cve` is this CVE. Only the entries for this CVE are read, because one advisory may cover several CVEs with different product statuses. The facts and their pointers:
+
+| Fact | From |
+| --- | --- |
+| `advisory_state` | `/document/tracking/status`. `final` is the published state; `draft` and `interim` produce a warning |
+| `advisory_severity` | `/document/aggregate_severity/text`, when present |
+| `advisory_summary` | The vulnerability entry's `title`, or `/document/title` when it has none |
+| `advisory_description` | The `text` of each note with category `summary` or `description`, in the document and in the entry |
+| `advisory_note` | Every other note except `legal_disclaimer`, with its `category`, `title` and `text`. Cisco writes fixed releases, workarounds and exploitation notes here, so read these before concluding that a fix is unstated |
+| `weakness` | The entry's `cwe` |
+| `cvss` | Each `cvss_v2`, `cvss_v3` and `cvss_v4` object under the entry's `scores` |
+| `affected` | Each product ID under `product_status.known_affected`, `first_affected`, `last_affected`, `known_not_affected` and `under_investigation`, with the status it was listed under |
+| `fixed` | Each product ID under `product_status.fixed` and `first_fixed` |
+| `remediation` | Each entry of `remediations`, as it appears (category such as `vendor_fix` or `workaround`, details, URL, product IDs) |
+| `threat` | Each entry of `threats`, as it appears (category such as `exploit_status`, details) |
+
+A product status fact carries `status`, the `product_id` as `original`, and what the `product_tree` says about that ID: its `name`, and `branches` (the path of `category`/`name` pairs from the vendor down to the version) or the `relationship` that composes it. Read `status` before treating a fact as affected; `known_not_affected` is listed under `affected` so that the vendor's negative statement keeps its citation. A product ID the tree does not define is kept with the ID alone and reported in `warnings`.
+
+```json
+{
+  "id": "F29",
+  "field": "affected",
+  "value": {
+    "status": "known_affected",
+    "product_id": "CSAFPID-286755",
+    "name": "13.0.0-392",
+    "branches": [
+      { "category": "vendor", "name": "Cisco" },
+      { "category": "product_family", "name": "Cisco Secure Email" },
+      { "category": "product_version", "name": "13.0" },
+      { "category": "service_pack", "name": "13.0.0-392" }
+    ]
+  },
+  "source_ids": ["S4"],
+  "source_pointer": "/vulnerabilities/0/product_status/known_affected/1",
+  "original": "CSAFPID-286755"
+}
+```
+
+Document references, acknowledgments and vendor bug IDs are not collected.
 
 ## State
 

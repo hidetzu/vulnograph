@@ -79,6 +79,7 @@ Sources:
 | [CVE Program](https://www.cve.org/) | The official CVE record: state, description, affected products, CVSS, CWE, references |
 | [NVD](https://nvd.nist.gov/) | NIST's analysis: CVSS, CWE, affected configurations (CPE) |
 | [GitHub Security Advisories](https://github.com/advisories) (GHSA) | Advisories referenced by the CVE, often from the project itself: details, affected and patched versions |
+| [Cisco Security Advisories](https://sec.cloudapps.cisco.com/security/center/publicationListing.x) (CSAF) | Cisco advisories referenced by the CVE, read from Cisco's CSAF distribution: affected and unaffected releases, fixed software, workarounds, exploitation notes |
 | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | Whether the CVE is known to be exploited in the wild |
 | [FIRST EPSS](https://www.first.org/epss/) | Estimated probability of exploitation |
 
