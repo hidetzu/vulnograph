@@ -32,18 +32,18 @@ See the [sample report for CVE-2026-109618](examples/CVE-2026-109618/report.md),
 ```mermaid
 flowchart LR
   subgraph IN["Entry point"]
-    A["Unauthenticated network request F24/S3"]
-    B["Attacker-controlled input, authentication unknown F24/S3"]
+    A["Unauthenticated network request F28/S3"]
+    B["Attacker-controlled input, authentication unknown F28/S3"]
   end
   subgraph CAUSE["Root cause"]
-    C["Request body parsing exhausts memory before the app runs F24/S3"]
-    D["Incomplete cleanup leaves corrupted state F24/S3"]
-    E["Memory runs out while the app is processing F24/S3"]
-    F["Incomplete cleanup leaves corrupted state F24/S3"]
+    C["Request body parsing exhausts memory before the app runs F28/S3"]
+    D["Incomplete cleanup leaves corrupted state F28/S3"]
+    E["Memory runs out while the app is processing F28/S3"]
+    F["Incomplete cleanup leaves corrupted state F28/S3"]
   end
   subgraph HARM["Impact"]
-    G["Code runs as the web server, demonstrated on Apache mod_php F24/S3"]
-    H["Possible on PHP-FPM, no complete exploit demonstrated F24/S3"]
+    G["Code runs as the web server, demonstrated on Apache mod_php F28/S3"]
+    H["Possible on PHP-FPM, no complete exploit demonstrated F28/S3"]
   end
   A --> C
   C --> D
@@ -55,7 +55,7 @@ flowchart LR
 
 How to read it:
 
-- `F24/S3` means the node is based on fact F24 from source S3 in `evidence.json`; the report lists each source's URL and retrieval time.
+- `F28/S3` means the node is based on fact F28 from source S3 in `evidence.json`; the report lists each source's URL and retrieval time.
 - Solid arrows are stated by the sources. Dashed arrows are possibilities the sources have not demonstrated.
 - The two rows are separate attack paths. A node the sources do not support is drawn as unknown.
 

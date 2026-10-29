@@ -190,7 +190,8 @@ func TestPHPBaseline(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if d.State != evidence.OK || len(d.Fixed) != 4 {
+	// Four branches, each stated by the CVE record's version ranges and again by the GHSA.
+	if d.State != evidence.OK || len(d.Fixed) != 8 {
 		t.Fatalf("baseline versions lost: %d", len(d.Fixed))
 	}
 	found := false
@@ -385,5 +386,108 @@ func TestWarningDeduplication(t *testing.T) {
 			t.Fatal("duplicate warning", w)
 		}
 		seen[w] = true
+	}
+}
+
+// TestRecordFixedVersions covers fixed versions and affected bounds derived
+// from the CVE record's version ranges, and the shapes that produce neither.
+func TestRecordFixedVersions(t *testing.T) {
+	type fixed struct{ version, branch, pointer string }
+	for _, tc := range []struct {
+		name     string
+		affected string
+		want     []fixed
+		bounds   []fixed
+	}{
+		{"explicit unaffected version", `{"product":"P","versions":[{"version":"0","lessThan":"1.43.3","status":"affected","versionType":"custom"},{"version":"1.43.3","status":"unaffected"}]}`,
+			[]fixed{{"1.43.3", "", "/containers/cna/affected/0/versions/1/version"}}, nil},
+		{"changes to unaffected per branch", `{"vendor":"V","product":"P","defaultStatus":"unaffected","versions":[{"version":"12.2.0","lessThan":"12.2.4","status":"affected","changes":[{"at":"12.2.4","status":"unaffected"}]},{"version":"12.1.0","lessThan":"12.1.10-h2","status":"affected","changes":[{"at":"12.1.4-h12","status":"unaffected"},{"at":"12.1.10-h2","status":"unaffected"}]}]}`,
+			[]fixed{{"12.2.4", "12.2.0", "/containers/cna/affected/0/versions/0/lessThan"}, {"12.1.10-h2", "12.1.0", "/containers/cna/affected/0/versions/1/lessThan"}, {"12.1.4-h12", "12.1.0", "/containers/cna/affected/0/versions/1/changes/0/at"}}, nil},
+		{"lessThan with unaffected default", `{"vendor":"PHP Group","product":"PHP","packageName":"php-src","defaultStatus":"unaffected","versions":[{"version":"8.2.*","lessThan":"8.2.35","status":"affected","versionType":"semver"},{"version":"8.3.*","lessThan":"8.3.36","status":"affected","versionType":"semver"}]}`,
+			[]fixed{{"8.2.35", "8.2.*", "/containers/cna/affected/0/versions/0/lessThan"}, {"8.3.36", "8.3.*", "/containers/cna/affected/0/versions/1/lessThan"}}, nil},
+		{"lessThan without default status is a bound only", `{"product":"Windows","versions":[{"version":"10.0.0","lessThan":"10.0.9612","status":"affected","versionType":"custom"}]}`, nil,
+			[]fixed{{"10.0.9612", "10.0.0", "/containers/cna/affected/0/versions/0/lessThan"}}},
+		{"lessThan with unknown default status is a bound only", `{"product":"P","defaultStatus":"unknown","versions":[{"version":"1.0","lessThan":"1.5","status":"affected"}]}`, nil,
+			[]fixed{{"1.5", "1.0", "/containers/cna/affected/0/versions/0/lessThan"}}},
+		{"bound equal to a stated fixed version is not repeated", `{"product":"P","versions":[{"version":"0","lessThan":"1.43.3","status":"affected"},{"version":"1.43.3","status":"unaffected"}]}`,
+			[]fixed{{"1.43.3", "", "/containers/cna/affected/0/versions/1/version"}}, nil},
+		{"bound and a different fixed version both kept", `{"product":"P","versions":[{"version":"1.0","lessThan":"2.0","status":"affected"},{"version":"3.0","status":"unaffected"}]}`,
+			[]fixed{{"3.0", "", "/containers/cna/affected/0/versions/1/version"}}, []fixed{{"2.0", "1.0", "/containers/cna/affected/0/versions/0/lessThan"}}},
+		{"same bound on two platforms recorded once per product entry", `{"product":"P","versions":[{"version":"1.0","lessThan":"1.5","status":"affected"},{"version":"1.0","lessThan":"1.5","status":"affected"}]}`, nil,
+			[]fixed{{"1.5", "1.0", "/containers/cna/affected/0/versions/0/lessThan"}}},
+		{"enumerated affected versions only", `{"product":"P","defaultStatus":"unknown","versions":[{"version":"14.0.0-698","status":"affected"},{"version":"15.0.0-104","status":"affected"}]}`, nil, nil},
+		{"product entirely unaffected", `{"product":"Cloud","defaultStatus":"unaffected","versions":[{"version":"All","status":"unaffected","versionType":"custom"}]}`, nil, nil},
+		{"unaffected version without any affected version", `{"product":"P","versions":[{"version":"2.0","status":"unaffected"}]}`, nil, nil},
+		{"lessThanOrEqual is inclusive", `{"product":"P","defaultStatus":"unaffected","versions":[{"version":"1.0","lessThanOrEqual":"1.3","status":"affected"}]}`, nil, nil},
+		{"lessThanOrEqual is no bound either", `{"product":"P","versions":[{"version":"1.0","lessThanOrEqual":"1.3","status":"affected"}]}`, nil, nil},
+		{"wildcard bound", `{"product":"P","defaultStatus":"unaffected","versions":[{"version":"1.0","lessThan":"1.*","status":"affected"}]}`, nil, nil},
+		{"wildcard bound without default status", `{"product":"P","versions":[{"version":"2.0","lessThan":"*","status":"affected"}]}`, nil, nil},
+		{"unaffected range is not a single version", `{"product":"P","versions":[{"version":"1.0","lessThan":"2.0","status":"affected"},{"version":"2.0","lessThan":"3.0","status":"unaffected"}]}`, nil,
+			[]fixed{{"2.0", "1.0", "/containers/cna/affected/0/versions/0/lessThan"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := copyFixture(t)
+			write(t, p, "cve", `{"cveMetadata":{"cveId":"CVE-2026-0001","state":"PUBLISHED"},"containers":{"cna":{"descriptions":[{"lang":"en","value":"Test"}],"affected":[`+tc.affected+`]}}}`)
+			d, e := (&Collector{Fixture: p}).Fetch(context.Background(), "CVE-2026-0001")
+			if e != nil {
+				t.Fatal(e)
+			}
+			var got, bounds []fixed
+			for _, f := range d.Facts {
+				if f.SourceIDs[0] != "S1" || (f.Field != "fixed" && f.Field != "affected_bound") {
+					continue
+				}
+				var v obj
+				if e := json.Unmarshal(f.Value, &v); e != nil {
+					t.Fatal(e)
+				}
+				var original string
+				if e := json.Unmarshal(f.Original, &original); e != nil || original != str(v["version"]) {
+					t.Fatalf("original must be the version text: %s", f.Original)
+				}
+				item := fixed{str(v["version"]), str(v["branch"]), f.SourcePointer}
+				if f.Field == "fixed" {
+					got = append(got, item)
+				} else {
+					bounds = append(bounds, item)
+				}
+			}
+			if fmt.Sprint(got) != fmt.Sprint(tc.want) {
+				t.Fatalf("fixed: got %v, want %v", got, tc.want)
+			}
+			if fmt.Sprint(bounds) != fmt.Sprint(tc.bounds) {
+				t.Fatalf("affected_bound: got %v, want %v", bounds, tc.bounds)
+			}
+			for _, id := range d.Fixed {
+				for _, f := range d.Lookup([]string{id}) {
+					if f.Field != "fixed" {
+						t.Fatal("affected_bound must not be indexed as fixed")
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestRecordFixedIdentity checks the product fields carried on a derived fact
+// and that the derived facts follow the record's affected facts.
+func TestRecordFixedIdentity(t *testing.T) {
+	d, e := (&Collector{Fixture: "../../testdata/CVE-2026-109618"}).Fetch(context.Background(), "CVE-2026-109618")
+	if e != nil {
+		t.Fatal(e)
+	}
+	byID := map[string]evidence.Fact{}
+	for _, f := range d.Facts {
+		byID[f.ID] = f
+	}
+	for i, want := range []string{"8.2.35", "8.3.36", "8.4.27", "8.5.12"} {
+		f, ok := byID[fmt.Sprintf("F%d", 4+i)]
+		var v obj
+		if !ok || f.Field != "fixed" || f.SourceIDs[0] != "S1" || json.Unmarshal(f.Value, &v) != nil {
+			t.Fatalf("derived fact F%d missing: %+v", 4+i, f)
+		}
+		if str(v["version"]) != want || str(v["vendor"]) != "PHP Group" || str(v["product"]) != "PHP" || str(v["packageName"]) != "php-src" {
+			t.Fatalf("unexpected derived fact: %v", v)
+		}
 	}
 }

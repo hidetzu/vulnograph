@@ -137,6 +137,9 @@ func (c *Collector) Fetch(ctx context.Context, input string) (evidence.Document,
 				for i, a := range list(cna["affected"]) {
 					d.Add("affected", a, s, evidence.Pointer("containers", "cna", "affected", i))
 				}
+				for i, a := range list(cna["affected"]) {
+					addRecordVersions(&d, object(a), s, i)
+				}
 				for i, m := range list(cna["metrics"]) {
 					d.Add("cvss", m, s, evidence.Pointer("containers", "cna", "metrics", i))
 				}
@@ -378,6 +381,87 @@ func addAdvisory(d *evidence.Document, a obj, id, ghsa, s string) {
 		if fixed != "" && fixed != patched {
 			d.AddNormalized("fixed", obj{"package": pkg, "version": fixed}, fixed, s, pointer)
 		}
+	}
+}
+
+// addRecordVersions derives, for one affected product of the CVE record, the
+// fixed versions the record states and the bounds it leaves undeclared.
+//
+// A fixed fact comes from a version listed as unaffected, a change to
+// unaffected inside a range, and the upper bound of an affected range when the
+// product's defaultStatus is unaffected (the record then declares that bound
+// unaffected). An affected_bound fact comes from the lessThan of an affected
+// range that the record does not declare unaffected, so that the Skill can
+// present it as an estimate rather than a fix. Wildcards, "All" and
+// lessThanOrEqual (inclusive) produce neither, and nothing is derived for a
+// product the record does not mark affected anywhere.
+func addRecordVersions(d *evidence.Document, a obj, s string, i int) {
+	at := func(parts ...any) string {
+		return evidence.Pointer(append([]any{"containers", "cna", "affected", i}, parts...)...)
+	}
+	versions := list(a["versions"])
+	affected := str(a["defaultStatus"]) == "affected"
+	for _, v := range versions {
+		affected = affected || str(object(v)["status"]) == "affected"
+	}
+	if !affected {
+		return
+	}
+	type derived struct{ field, version, branch, pointer string }
+	var facts []derived
+	fixed := map[string]bool{}
+	add := func(field, version, branch, pointer string) {
+		if version == "" || strings.Contains(version, "*") || strings.EqualFold(version, "all") {
+			return
+		}
+		for _, f := range facts {
+			if f.field == field && f.version == version && f.branch == branch {
+				return
+			}
+		}
+		facts = append(facts, derived{field, version, branch, pointer})
+		if field == "fixed" {
+			fixed[version] = true
+		}
+	}
+	unaffectedDefault := str(a["defaultStatus"]) == "unaffected"
+	for j, v := range versions {
+		entry := object(v)
+		single := entry["lessThan"] == nil && entry["lessThanOrEqual"] == nil && len(list(entry["changes"])) == 0
+		switch str(entry["status"]) {
+		case "unaffected":
+			if single {
+				add("fixed", str(entry["version"]), "", at("versions", j, "version"))
+			}
+		case "affected":
+			if entry["lessThan"] != nil {
+				field := "affected_bound"
+				if unaffectedDefault {
+					field = "fixed"
+				}
+				add(field, str(entry["lessThan"]), str(entry["version"]), at("versions", j, "lessThan"))
+			}
+		}
+		for k, c := range list(entry["changes"]) {
+			if str(object(c)["status"]) == "unaffected" {
+				add("fixed", str(object(c)["at"]), str(entry["version"]), at("versions", j, "changes", k, "at"))
+			}
+		}
+	}
+	for _, f := range facts {
+		if f.field == "affected_bound" && fixed[f.version] {
+			continue
+		}
+		value := obj{"version": f.version}
+		for _, key := range []string{"vendor", "product", "packageName"} {
+			if text := str(a[key]); text != "" {
+				value[key] = text
+			}
+		}
+		if f.branch != "" {
+			value["branch"] = f.branch
+		}
+		d.AddNormalized(f.field, value, f.version, s, f.pointer)
 	}
 }
 
