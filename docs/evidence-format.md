@@ -1,6 +1,6 @@
 # Evidence format
 
-`vulnograph fetch` writes one JSON document per CVE. This page describes `schema_version: "0.2"`. The [Go type definitions](../internal/evidence/evidence.go) are the source of truth; incompatible changes bump the version and are recorded in the [CHANGELOG](../CHANGELOG.md).
+`vulnograph fetch` writes one JSON document per CVE. This page describes `schema_version: "0.3"`. The [Go type definitions](../internal/evidence/evidence.go) are the source of truth; incompatible changes bump the version and are recorded in the [CHANGELOG](../CHANGELOG.md).
 
 The document only records what each source says. It never merges differing statements, and never decides whether a particular environment is vulnerable.
 
@@ -129,12 +129,12 @@ The document is validated before any fact is taken: `csaf_version` must be 2.x, 
 | `advisory_note` | Every other note except `legal_disclaimer`, with its `category`, `title` and `text`. Cisco writes fixed releases, workarounds and exploitation notes here, so read these before concluding that a fix is unstated |
 | `weakness` | The entry's `cwe` |
 | `cvss` | Each `cvss_v2`, `cvss_v3` and `cvss_v4` object under the entry's `scores` |
-| `affected` | Each product ID under `product_status.known_affected`, `first_affected`, `last_affected`, `known_not_affected` and `under_investigation`, with the status it was listed under |
+| `affected` | Each product ID under `product_status.known_affected`, `first_affected`, `last_affected`, `known_not_affected`, `under_investigation` and `recommended`, with the status it was listed under. `recommended` is a vendor recommendation, not a statement that the release contains the fix |
 | `fixed` | Each product ID under `product_status.fixed` and `first_fixed` |
 | `remediation` | Each entry of `remediations`, as it appears (category such as `vendor_fix` or `workaround`, details, URL, product IDs) |
 | `threat` | Each entry of `threats`, as it appears (category such as `exploit_status`, details) |
 
-A product status fact carries `status`, the `product_id` as `original`, and what the `product_tree` says about that ID: its `name`, and `branches` (the path of `category`/`name` pairs from the vendor down to the version) or the `relationship` that composes it. Read `status` before treating a fact as affected; `known_not_affected` is listed under `affected` so that the vendor's negative statement keeps its citation. A product ID the tree does not define is kept with the ID alone and reported in `warnings`.
+A product status fact carries `status`, the `product_id` as `original`, and what the `product_tree` says about that ID: its `name`, and `branches` (the path of `category`/`name` pairs from the vendor down to the version) or the `relationship` that composes it. Read `status` before treating a fact as affected; `known_not_affected` is listed under `affected` so that the vendor's negative statement keeps its citation, and this is why format 0.3 is not a drop-in for readers that took every entry of the `affected` index as affected. A product ID the tree does not define is kept with the ID alone and reported in `warnings`. A product ID listed in more than one CSAF status group (affected, not affected, fixed, under investigation) is kept under each status and reported in `warnings` as contradicting; `recommended` belongs to no group.
 
 ```json
 {

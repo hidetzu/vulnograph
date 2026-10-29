@@ -155,6 +155,7 @@ func addCSAF(d *evidence.Document, a obj, id, advisory, s string) {
 	}
 	addCSAFNotes(d, doc["notes"], s, "document", "notes")
 	undefined := map[string]bool{}
+	contradicted := map[string]bool{}
 	for _, i := range matches {
 		v := object(vulnerabilities[i])
 		at := func(parts ...any) string { return evidence.Pointer(append([]any{"vulnerabilities", i}, parts...)...) }
@@ -176,12 +177,21 @@ func addCSAF(d *evidence.Document, a obj, id, advisory, s string) {
 				}
 			}
 		}
-		for _, status := range []string{"known_affected", "first_affected", "last_affected", "known_not_affected", "under_investigation", "fixed", "first_fixed"} {
+		productStatus := object(v["product_status"])
+		for _, productID := range contradictingProducts(productStatus) {
+			if !contradicted[productID] {
+				contradicted[productID] = true
+				d.Warnings = append(d.Warnings, s+": CSAF product ID "+productID+" has contradicting statuses")
+			}
+		}
+		// recommended is a vendor recommendation, not a statement that the
+		// release contains the fix, so it is never read as fixed.
+		for _, status := range []string{"known_affected", "first_affected", "last_affected", "known_not_affected", "under_investigation", "recommended", "fixed", "first_fixed"} {
 			field := "affected"
 			if status == "fixed" || status == "first_fixed" {
 				field = "fixed"
 			}
-			for m, pid := range list(object(v["product_status"])[status]) {
+			for m, pid := range list(productStatus[status]) {
 				productID := str(pid)
 				if productID == "" {
 					continue
@@ -205,6 +215,37 @@ func addCSAF(d *evidence.Document, a obj, id, advisory, s string) {
 			d.Add("threat", threat, s, at("threats", k))
 		}
 	}
+}
+
+// contradictingProducts returns, in order of first appearance, the product IDs
+// that a product_status lists in more than one of the CSAF status groups
+// (affected, not affected, fixed, under investigation). CSAF forbids this;
+// vulnograph keeps every statement and warns instead of choosing one.
+func contradictingProducts(productStatus obj) []string {
+	groups := map[string]string{"first_affected": "affected", "known_affected": "affected", "last_affected": "affected", "known_not_affected": "not_affected", "first_fixed": "fixed", "fixed": "fixed", "under_investigation": "under_investigation"}
+	seen := map[string]string{}
+	var order, contradicting []string
+	for _, status := range []string{"first_affected", "known_affected", "last_affected", "known_not_affected", "first_fixed", "fixed", "under_investigation"} {
+		for _, pid := range list(productStatus[status]) {
+			productID := str(pid)
+			if productID == "" {
+				continue
+			}
+			prior, listed := seen[productID]
+			if !listed {
+				seen[productID] = groups[status]
+				order = append(order, productID)
+			} else if prior != groups[status] && prior != "contradicting" {
+				seen[productID] = "contradicting"
+			}
+		}
+	}
+	for _, productID := range order {
+		if seen[productID] == "contradicting" {
+			contradicting = append(contradicting, productID)
+		}
+	}
+	return contradicting
 }
 
 // addCSAFNotes records summary and description notes as advisory_description

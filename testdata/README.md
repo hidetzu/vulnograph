@@ -48,7 +48,8 @@ Each directory contains only the response files that override `synthetic`. The e
 | csaf-version-unsupported | The CSAF version is not 2.x |
 | csaf-draft | The CSAF tracking status is `draft` |
 | csaf-product-undefined | A product status names an ID the product tree does not define |
-| csaf-fixed-status | The CSAF document lists `fixed` and `first_fixed` products |
+| csaf-fixed-status | The CSAF document lists `fixed`, `first_fixed` and `recommended` products |
+| csaf-status-contradiction | The same product ID is listed as known affected and known not affected |
 | csaf-multi-cve | The CSAF document covers two CVEs with different product statuses |
 | csaf-index-unlisted | The CSAF index does not list the advisory |
 | csaf-index-malformed | The CSAF index contains a path outside the distribution |

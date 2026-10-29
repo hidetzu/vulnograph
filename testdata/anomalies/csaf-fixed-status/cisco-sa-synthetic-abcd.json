@@ -127,9 +127,13 @@
           "CSAFPID-2"
         ],
         "fixed": [
-          "CSAFPID-2"
+          "CSAFPID-3"
         ],
         "first_fixed": [
+          "CSAFPID-3"
+        ],
+        "recommended": [
+          "CSAFPID-3",
           "CSAFPID-2"
         ]
       },

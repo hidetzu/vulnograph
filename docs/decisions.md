@@ -30,6 +30,8 @@ Each entry records a decision, why it was made, and the alternatives that were n
 
 **Differing descriptions are conflict candidates, not conflicts.** Only descriptions in the same language are compared, so translations are not reported. Whether a difference in wording is a real contradiction is left to the Skill or a human. Semantic comparison of version ranges is not implemented.
 
+**Schema 0.3: the `affected` index carries product statuses.** CSAF states, per product, whether it is affected, not affected, fixed, under investigation or recommended. Keeping the vendor's negative and undecided statements with their citations was preferred over an index that holds only positives, so every CSAF product status is an `affected` fact with a `status`, except `fixed` and `first_fixed`, which are `fixed` facts. `recommended` is kept but never read as fixed, since the specification says a recommended release need not contain the fix. The version was bumped because a reader of 0.2 could take every `affected` entry as affected.
+
 **Schema 0.2: values are stored once, located by JSON Pointer.** `cvss`, `affected` and `fixed` became Fact ID indexes instead of copies of facts, and each fact records a `source_pointer` into the retrieved body, with `original` only when the value was normalized. Storing excerpt strings was rejected because it duplicates the source. No compatibility layer for 0.1 was written, as 0.1 was never released.
 
 ## Reports and diagrams

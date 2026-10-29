@@ -203,14 +203,14 @@ func TestAnomalyFixtures(t *testing.T) {
 			for _, f := range d.Lookup(d.Affected) {
 				var v obj
 				json.Unmarshal(f.Value, &v)
-				if str(v["product_id"]) == "CSAFPID-404" {
+				if str(v["product_id"]) == "CSAFPID-404" || str(v["product_id"]) == "CSAFPID-405" {
 					undefined++
 					if v["name"] != nil || v["branches"] != nil {
 						t.Fatal("undefined product given a name", v)
 					}
 				}
 			}
-			if undefined != 2 || !warned(d, "CSAFPID-404 is not defined") || strings.Count(strings.Join(d.Warnings, "\n"), "CSAFPID-404") != 1 {
+			if undefined != 2 || !warned(d, "CSAFPID-404 is not defined") || !warned(d, "CSAFPID-405 is not defined") || strings.Count(strings.Join(d.Warnings, "\n"), "CSAFPID-404") != 1 {
 				t.Fatal("undefined product ID not kept with one warning", undefined, d.Warnings)
 			}
 		}},
@@ -219,9 +219,18 @@ func TestAnomalyFixtures(t *testing.T) {
 			if len(fixed) != 3 || fixed[1].SourcePointer != "/vulnerabilities/0/product_status/fixed/0" || fixed[2].SourcePointer != "/vulnerabilities/0/product_status/first_fixed/0" {
 				t.Fatal("CSAF fixed statuses not indexed", fixed)
 			}
+			recommended := 0
+			for _, f := range d.Lookup(d.Affected) {
+				if strings.Contains(f.SourcePointer, "/recommended/") {
+					recommended++
+				}
+			}
+			if recommended != 2 || warned(d, "contradicting") {
+				t.Fatal("recommended releases not kept as their own status", recommended, d.Warnings)
+			}
 			var v obj
 			json.Unmarshal(fixed[1].Value, &v)
-			if str(v["status"]) != "fixed" || str(v["name"]) != "2.0.0" || string(fixed[1].Original) != `"CSAFPID-2"` {
+			if str(v["status"]) != "fixed" || str(v["name"]) != "Synthetic Gateway Appliance" || string(fixed[1].Original) != `"CSAFPID-3"` {
 				t.Fatal("fixed product lost", v)
 			}
 		}},
@@ -241,6 +250,23 @@ func TestAnomalyFixtures(t *testing.T) {
 			}
 			if statuses != 3 {
 				t.Fatal("statuses for the CVE lost", statuses)
+			}
+		}},
+		{"csaf-status-contradiction", func(t *testing.T, d evidence.Document) {
+			statuses := map[string]int{}
+			for _, f := range d.Lookup(d.Affected) {
+				var v obj
+				json.Unmarshal(f.Value, &v)
+				if str(v["product_id"]) == "CSAFPID-1" {
+					statuses[str(v["status"])]++
+				}
+			}
+			if statuses["known_affected"] != 1 || statuses["known_not_affected"] != 1 || statuses["recommended"] != 1 {
+				t.Fatal("contradicting statements not both kept", statuses)
+			}
+			joined := strings.Join(d.Warnings, "\n")
+			if strings.Count(joined, "CSAFPID-1 has contradicting statuses") != 1 || strings.Contains(joined, "CSAFPID-2 has") || strings.Contains(joined, "CSAFPID-3 has") {
+				t.Fatal("contradiction warning wrong", d.Warnings)
 			}
 		}},
 		{"csaf-index-unlisted", func(t *testing.T, d evidence.Document) {

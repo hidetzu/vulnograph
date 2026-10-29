@@ -176,3 +176,22 @@ func TestCSAFDuplicateReference(t *testing.T) {
 		t.Fatalf("duplicate advisory handling: %v %+v", kinds, duplicate)
 	}
 }
+
+func TestContradictingProducts(t *testing.T) {
+	status := obj{
+		"first_affected":      []any{"A", "B"},
+		"known_affected":      []any{"A", "C", "D"},
+		"last_affected":       []any{"E"},
+		"known_not_affected":  []any{"B", "F"},
+		"fixed":               []any{"C", "G"},
+		"first_fixed":         []any{"G"},
+		"under_investigation": []any{"D", "F", ""},
+		"recommended":         []any{"A", "B", "C", "E", "G"},
+	}
+	if got := strings.Join(contradictingProducts(status), ","); got != "B,C,D,F" {
+		t.Fatal(got)
+	}
+	if got := contradictingProducts(obj{"known_affected": []any{"A"}, "fixed": []any{"B"}}); len(got) != 0 {
+		t.Fatal(got)
+	}
+}
